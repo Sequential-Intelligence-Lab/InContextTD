@@ -15,15 +15,13 @@ class TFLayer:
         self.M[-1, -1] = 0
         I = np.eye(d)
         O = np.zeros((d, d))
-        self.M1 = stack_four(I, -I, O, O)
-        self.M2 = stack_four(I, O, O, O)
+        self.M1 = stack_four(-I, I, O, O)
         # self.C = I 
         self.C = np.random.randn(d, d) 
         self.B = stack_four(self.C.T, O, O, O)
-        self.A = self.M2.T @ self.B @ self.M1
+        self.A = self.B @ self.M1
         self.Q = np.zeros(self.P.shape)
         self.Q[:2*d, :2*d] = self.A
-        self.Q = - self.Q
     
     def forward(self, Z):
         next_Z = Z + 1.0 / self.n * self. P @ Z @ self.M @ Z.T @ self.Q @ Z
@@ -56,7 +54,7 @@ class Prompt:
         self.r = np.reshape(self.r, (1, -1))
     
     def z(self):
-        return np.concatenate([self.phi, self.phi_prime, -self.r], axis=0)
+        return np.concatenate([self.phi, self.phi_prime, self.r], axis=0)
     
     def td_update(self, w, C):
         u = 0
@@ -93,7 +91,7 @@ def verify(d, n, l):
         w, v = pro.td_update(w, tf.Cs[i])
         td_value.append(v)
     td_value = np.array(td_value).flatten()
-    print(tf_value - td_value)
+    print(tf_value + td_value)
 # 
 if __name__ == '__main__':
     verify(4, 9, 10)
