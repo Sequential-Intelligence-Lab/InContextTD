@@ -93,7 +93,7 @@ def verify(d, n, l):
         w, v = pro.td_update(w, tf.Cs[i])
         td_value.append(v)
     td_value = np.array(td_value).flatten()
-    print(tf_value - td_value)
+    print(tf_value + td_value)
 # 
 if __name__ == '__main__':
     verify(4, 9, 10)
