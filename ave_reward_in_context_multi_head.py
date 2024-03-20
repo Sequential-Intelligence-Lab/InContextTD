@@ -80,16 +80,9 @@ class Prompt:
 
         # randomly initialize some rewards
         self.r = [torch.randn(1).item() for _ in range(self.n)]
-        # initialize r_bar
-        # let r_bar[i] be the sums of the rewards up through element i
-        self.r_bar = [1/(i+1)*sum(self.r[:i+1]) for i in range(self.n)]
         self.r.append(0)
         self.r = torch.tensor(self.r)
         self.r = torch.reshape(self.r, (1, -1))
-
-        self.r_bar.append(0)
-        self.r_bar = torch.tensor(self.r_bar)
-        self.r_bar = torch.reshape(self.r_bar, (1, -1))
 
     def z(self):
         return torch.cat([self.phi, self.phi_prime, self.r, torch.zeros((1, self.n + 1))], dim=0)
