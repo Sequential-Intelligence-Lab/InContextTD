@@ -3,7 +3,7 @@ import torch.nn as nn
 
 
 class LinearAttention(nn.Module):
-    def __init__(self, d: int, n: int):
+    def __init__(self, d: int, n: int, lmbd: float = 0.0):
         '''
         d: feature dimension
         n: context length
@@ -16,6 +16,9 @@ class LinearAttention(nn.Module):
         nn.init.xavier_normal_(self.P, gain=0.1)
 
         self.M = torch.eye(n + 1)
+        for col in range(n):
+            for row in range(col+1, n):
+                self.M[row, col] = lmbd*self.M[row-1, col]
         self.M[-1, -1] = 0
 
         self.Q = nn.Parameter(torch.empty(2 * d + 1, 2 * d + 1))
@@ -30,6 +33,7 @@ class LinearTransformer(nn.Module):
                  d: int,
                  n: int,
                  l: int,
+                 lmbd: float = 0.0,
                  mode='auto'):
         '''
         d: feature dimension
@@ -42,11 +46,10 @@ class LinearTransformer(nn.Module):
         self.l = l
         self.mode = mode
         if mode == 'auto':
-            self.attn = LinearAttention(d, n)
+            self.attn = LinearAttention(d, n, lmbd)
         elif mode == 'sequential':
-            self.layers = nn.ModuleList([LinearAttention(d, n) for _ in range(l)])
-        
-
+            self.layers = nn.ModuleList(
+                [LinearAttention(d, n, lmbd) for _ in range(l)])
 
     def forward(self, Z):
         if self.mode == 'auto':
@@ -55,7 +58,7 @@ class LinearTransformer(nn.Module):
         else:
             for attn in self.layers:
                 Z = attn(Z)
-        
+
         return Z
 
 
@@ -65,9 +68,10 @@ if __name__ == '__main__':
     n = 10
     l = 5
     gamma = 0.9
+    lmbd = 0.9
     prompt = Prompt(d, n, gamma)
     Z_0 = prompt.z()
-    ltf = LinearTransformer(d, n, l, mode='auto')
+    ltf = LinearTransformer(d, n, l, lmbd, mode='auto')
     Z_tf = ltf(Z_0)
     print(Z_tf)
     print(Z_tf.shape)
