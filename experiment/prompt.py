@@ -1,12 +1,18 @@
 import torch
 
 class Prompt:
-    def __init__(self, d: int, n: int,
-                 gamma: float, noise: float = 0.0):
+    def __init__(self, 
+                 d: int, 
+                 n: int,
+                 gamma: float, 
+                 w: torch.Tensor = None,
+                 noise: float = 0.0):
         '''
         d: feature dimension
         n: context length
         gamma: discount factor
+        w: weight vector (optional)
+        noise: reward noise level
         '''
         self.d = d
         self.n = n
@@ -18,20 +24,25 @@ class Prompt:
         phi_prime = torch.concat([phi_prime, torch.zeros((d, 1))], dim=1)
         self.phi_prime = gamma * phi_prime
 
-        self.w = torch.randn((d, 1))
+        if w:
+            self.w = w
+        else:
+            self.w = torch.randn((d, 1))
 
         r = self.w.t() @ self.phi - self.w.t() @ self.phi_prime
-        r += noise * torch.randn((1, n+1))
+        r += noise * torch.randn((1, n+1)) # add random noise
         r[0, -1] = 0
-        self.r = r 
+        self.r = r
 
     def z(self):
         return torch.cat([self.phi, self.phi_prime, self.r], dim=0)
 
-    def td_update(self, w: torch.Tensor, C: torch.Tensor = None):
+    def td_update(self, 
+                  w: torch.Tensor, 
+                  C: torch.Tensor = None):
         '''
         w: weight vector
-        C: conditioning matrix
+        C: preconditioning matrix
         '''
         u = 0
         for j in range(self.n):
@@ -52,7 +63,7 @@ if __name__ == '__main__':
     d = 3
     n = 20
     gamma = 0.9
-    pro = Prompt(d, n, gamma, 0.1)
+    pro = Prompt(d, n, gamma)
     true_w = pro.w
     true_v = true_w.t() @ pro.phi[:, [-1]]
     w = torch.zeros((d, 1))
