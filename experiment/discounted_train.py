@@ -2,7 +2,6 @@ import matplotlib.pyplot as plt
 import numpy as np
 import torch
 import torch.optim as optim
-from tqdm import tqdm
 
 from experiment.model import LinearTransformer
 from experiment.prompt import Prompt
@@ -15,11 +14,12 @@ def train(d: int,
           n: int,
           l: int,
           gamma: float = 0.9,
+          lmbd: float = 0.0,
           lr: float = 0.001,
           epochs: int = 50_000,
           log_interval: int = 200):
 
-    tf = LinearTransformer(d, n, l, mode='auto')
+    tf = LinearTransformer(d, n, l, lmbd, mode='auto')
     opt = optim.Adam(tf.parameters(), lr=lr, weight_decay=1e-5)
 
     # Transformer with hardcoded weights according to our analytical TD update
