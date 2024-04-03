@@ -56,7 +56,7 @@ class LinearTransformer(nn.Module):
             for attn in self.layers:
                 Z = attn(Z)
         
-        return Z
+        return -Z[-1, -1].item(), Z
 
 
 if __name__ == '__main__':
@@ -68,6 +68,6 @@ if __name__ == '__main__':
     prompt = Prompt(d, n, gamma)
     Z_0 = prompt.z()
     ltf = LinearTransformer(d, n, l, mode='auto')
-    Z_tf = ltf(Z_0)
+    _, Z_tf = ltf(Z_0)
     print(Z_tf)
     print(Z_tf.shape)

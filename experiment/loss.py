@@ -17,6 +17,7 @@ def mean_squared_td_error(w: torch.tensor,
     reward_vec = Z[-1, :n].reshape(1, n)
 
     v_vec = w.t() @ Phi
+    # use detach() to prevent backpropagation through w here
     v_prime_vec = w.t().detach() @ Phi_prime
     tde_vec = reward_vec + v_prime_vec - v_vec
     mstde = torch.mean(tde_vec**2, dim=1)
