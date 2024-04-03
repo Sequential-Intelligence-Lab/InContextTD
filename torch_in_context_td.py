@@ -42,7 +42,7 @@ class HC_Transformer(nn.Module):
         v = []
         for layer in self.layers:
             Z = layer.forward(Z)
-            v.append(-Z[-1, -1].item()) # negate it to align with the convention
+            v.append(-Z[-1, -1]) # negate it to align with the convention
         return v, Z
 
 class Prompt:
@@ -90,8 +90,10 @@ def verify(d, n, l):
     for i in range(l):
         w, v = pro.td_update(w, tf.Cs[i])
         td_value.append(v)
-    td_value = np.array(td_value).flatten()
+    
+    tf_value = [t.detach().numpy() for t in tf_value]
+    tf_value = np.array(tf_value)
     print(tf_value - td_value)
 
 if __name__ == '__main__':
-    verify(4, 9, 10)
+    verify(4, 250, 10)

@@ -30,7 +30,8 @@ def train(d: int,
     mstdes = [] # mean squared td errors
     wes = [] # weight error norms
     ves = [] # value errors (absolute difference between true and learned tf predicted value)
-    hc_ves = [] # value errors (absolute difference between learned and hardcoded tf predicted value)
+    hc_ves = [] # value errors (absolute difference between true and hardcoded tf predicted value)
+    hc_train_ves = [] # value errors (absolute difference between learned and hardcoded tf predicted value)
     for i in range(epochs): 
         #generate a new prompt
         pro = Prompt(d, n, gamma, noise=0.0)
@@ -53,18 +54,20 @@ def train(d: int,
         opt.step()
 
         # compare the learned weight prediction with the hardcoded TD weight prediction
-        w_tf_hc = manual_weight_extraction(hc_tf, Z_0, d)
-        v_tf_hc = w_tf_hc.t() @ phi_query
-        v_tf_hc2, _ = hc_tf.forward(Z_0)
-        #import pdb; pdb.set_trace()
+        #w_tf_hc = manual_weight_extraction(hc_tf, Z_0, d)
+        #v_tf_hc = w_tf_hc.t() @ phi_query
+        v_out, _ = hc_tf.forward(Z_0)
+        v_tf_hc = v_out[-1]
         #assert round(v_tf_hc.item(),2) == round(v_tf_hc2[-1],2) # sanity check on the hardcoded transformer
 
         if i % log_interval == 0:
+            import pdb; pdb.set_trace()
             xs.append(i)
             mstdes.append(mstde.item())
             wes.append(weight_error_norm(w_tf, true_w).item())
             ves.append(value_error(v_tf, true_v).item())
-            hc_ves.append(value_error(v_tf, v_tf_hc).item()) # compare prediction error between the learned tf with the hardcoded TD tf
+            hc_ves.append(value_error(v_tf_hc,true_v).item()) # compare prediction error between the  hardcoded TD tf and the ground truth
+            hc_train_ves.append(value_error(v_tf_hc, v_tf).item()) # compare prediction error between the learned tf with the hardcoded TD tf
 
             print('Epoch:', i)
             print('Transformer Learned Weight:\n', w_tf.detach().numpy())
@@ -74,32 +77,39 @@ def train(d: int,
     mstdes.append(mstde.item())
     wes.append(weight_error_norm(w_tf, true_w).item())
     ves.append(value_error(v_tf, true_v).item())
-    hc_ves.append(value_error(v_tf, v_tf_hc).item())
+    hc_ves.append(value_error(true_v, v_tf_hc).item())
+    hc_train_ves.append(value_error(v_tf, v_tf_hc).item())
 
     print('Transformer Learned Weight:\n', w_tf.detach().numpy())
+    plt.figure()
     plt.title('Learned Transformer vs Ground Truth')
     plt.yscale('log')
     plt.plot(xs, mstdes, label='Mean Squared TD Error')
     plt.plot(xs, wes, label='Weight(w) Error Norm')
     plt.plot(xs, ves, label='Absolute Value Error (vs True Value)')
-    plt.plot(xs, hc_ves, label='Absolute Value Error (vs HC TF)')
+    plt.plot(xs, hc_train_ves, label='AVE (Learned TF vs HC)')
     plt.grid()
     plt.legend()
     plt.show()
 
+    plt.figure()
+    plt.title('Learned Transformer vs Hardcoded Transformer')
+    plt.yscale('log')
+    plt.plot(xs, hc_ves, label='AVE (HC vs Ground Truth)')
+    plt.grid()
+    plt.legend()
+    plt.show()
 
 if __name__ == '__main__':
     torch.manual_seed(5)
     np.random.seed(5)
     d = 4
-    n = 250
-    l = 6
+    n = 300
+    l = 10
     train(d, n, l)
 
-    # after this we need to evaluate the performance of our meta trained transformer
+    # TODO:
+    # 1. Investigate the numerical instability issue with large n and l
+    # 2. Do a weight comparison between HC and learned transformer
 
-    # Weight Error
-
-
-# so some things to check are the metrics for the weight error with the TD learned weights not the ground truth
 # we also need to check P and Q for the transformer using the implicit linear weight difference or cosine similarity of the sensitvities 
