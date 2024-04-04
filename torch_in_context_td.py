@@ -31,9 +31,9 @@ class TFLayer(nn.Module):
         next_Z = Z + 1.0 / self.n * self.P @ Z @ self.M @ Z.T @ self.Q @ Z
         return next_Z
 
-class Transformer(nn.Module):
+class HC_Transformer(nn.Module):
     def __init__(self, l, d, n):
-        super(Transformer, self).__init__()
+        super(HC_Transformer, self).__init__()
         self.n = n
         self.layers = nn.ModuleList([TFLayer(d, n) for _ in range(l)])
         self.Cs = [layer.C for layer in self.layers]
@@ -42,7 +42,7 @@ class Transformer(nn.Module):
         v = []
         for layer in self.layers:
             Z = layer.forward(Z)
-            v.append(Z[-1, -1].item())
+            v.append(-Z[-1, -1]) # negate it to align with the convention
         return v, Z
 
 class Prompt:
@@ -75,14 +75,14 @@ class Prompt:
 def g(pro, tf, phi, phi_prime, r):
     pro.phi[:, [-1]] = phi
     pro.phi_prime[:, [-1]] = phi_prime
-    pro.r[0, -1] = r
+    pro.r[-1, -1] = r
     _, Z = tf.forward(pro.z())
     return Z
 
 
 def verify(d, n, l):
     gamma = 0.9
-    tf = Transformer(l, d, n)
+    tf = HC_Transformer(l, d, n)
     pro = Prompt(d, n, gamma)
     tf_value, _ = tf.forward(pro.z())
     w = torch.zeros((d, 1))
@@ -90,8 +90,10 @@ def verify(d, n, l):
     for i in range(l):
         w, v = pro.td_update(w, tf.Cs[i])
         td_value.append(v)
-    td_value = np.array(td_value).flatten()
-    print(tf_value + td_value)
+    
+    tf_value = [t.detach().numpy() for t in tf_value]
+    tf_value = np.array(tf_value)
+    print(tf_value - td_value)
 
 if __name__ == '__main__':
-    verify(4, 9, 10)
+    verify(4, 250, 10)
