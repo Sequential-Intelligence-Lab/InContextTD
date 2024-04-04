@@ -18,7 +18,7 @@ def train(d: int,
           epochs: int = 50_000,
           log_interval: int = 200):
 
-    tf = LinearTransformer(d, n, l, lmbd, mode='auto')
+    tf = LinearTransformer(d, n, l, lmbd, mode='sequential')
     opt = optim.Adam(tf.parameters(), lr=lr, weight_decay=1e-5)
 
     # Transformer with hardcoded weights according to our analytical TD update
@@ -108,15 +108,9 @@ def train(d: int,
     plt.show()
 
 if __name__ == '__main__':
-    torch.manual_seed(5)
-    np.random.seed(5)
-    d = 4
-    n = 250
-    l = 6
-    train(d, n, l)
-
-    # TODO:
-    # 1. Investigate the numerical instability issue with large n and l
-    # 2. Do a weight comparison between HC and learned transformer
-
-# we also need to check P and Q for the transformer using the implicit linear weight difference or cosine similarity of the sensitvities 
+    torch.manual_seed(2)
+    np.random.seed(2)
+    d = 5
+    n = 400
+    l = 8
+    train(d, n, l, lmbd=0.0, epochs=10000)
