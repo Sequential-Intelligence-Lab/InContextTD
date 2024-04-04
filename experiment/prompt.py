@@ -1,5 +1,5 @@
 import torch
-#from experiment.boyan import BoyanChain
+from experiment.boyan import BoyanChain
 import numpy as np
 
 class Feature:
@@ -88,22 +88,36 @@ class MDP_Prompt:
         self.n = n
         self.gamma = gamma
 
-
+        rows = []
         # sample from initial state distribution
         s = mdp.reset()
-        for _ in range(self.n-1):
+        for _ in range(self.n):
             s_prime, r = mdp.step(s)
-            column = np.concatenate([features.get_feature(s), features.get_feature(s_prime),r], axis=1).reshape(-1,1)
-
-        self.z_0 = torch.tensor(np.transpose(context))
-
+            row = np.concatenate([features.get_feature(s), self.gamma*features.get_feature(s_prime), [r]])
+            rows.append(row)
+            s = s_prime
         
+        # randomly sample a query state from the initial state distribution
+        rows.append(np.concatenate([features.get_feature(mdp.reset()), np.zeros(features.d), [0]]))
+        # TODO: do we want to also shuffle the rows or can we preserve the order?
+        context = np.stack(rows, axis=-1)
+        self.z_0 = torch.tensor(context, dtype=torch.float64)
+
+    def get_prompt(self):
+        return self.z_0
+
 if __name__ == '__main__':
     d = 3
     s = 5
-    n = 20
+    n = 8
     gamma = 0.9
     feat = Feature(d, s)
+    bc = BoyanChain(s)
+    mdp_prompt = MDP_Prompt(bc, feat, n, gamma)
+
+    print("Features")
     print(feat.phi)
-    print(feat.get_feature(2))
-    import pdb; pdb.set_trace()
+    print("Z_0")
+    print(mdp_prompt.z_0)
+    assert mdp_prompt.z_0.shape == (2*d+1, n+1)
+
