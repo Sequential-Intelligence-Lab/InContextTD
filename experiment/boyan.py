@@ -4,6 +4,7 @@ from typing import Tuple
 class BoyanChain:
     def __init__(self, n_states: int, gamma: float = 0.9) -> None:
         self.n_states = n_states
+        self.gamma = gamma
         self.P = np.zeros((n_states, n_states))
         for i in range(n_states - 2):
             self.P[i, i + 1] = 0.5
