@@ -21,7 +21,7 @@ class TFLayer(nn.Module):
         I = torch.eye(d)
         O = torch.zeros((d, d))
         self.M1 = stack_four(-I, I, O, O)
-        self.C = torch.randn(d, d)
+        self.C = torch.eye(d) #torch.randn(d, d)
         self.B = stack_four(self.C.t(), O, O, O)
         self.A = torch.mm(self.B, self.M1)
         self.Q = torch.zeros_like(self.P)

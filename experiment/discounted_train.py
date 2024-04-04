@@ -9,7 +9,6 @@ from experiment.utils import manual_weight_extraction
 from experiment.loss import mean_squared_td_error, weight_error_norm, value_error
 from torch_in_context_td import HC_Transformer
 
-
 def train(d: int,
           n: int,
           l: int,
@@ -53,21 +52,29 @@ def train(d: int,
         total_loss.backward(retain_graph=True) # how does this backward work here if we extract w_tf manually? 
         opt.step()
 
-        # compare the learned weight prediction with the hardcoded TD weight prediction
+        # Compare the learned weight with the hardcoded TD weight value predictions (3 ways to compute the same thing for sanity check)
+
+        # 1. extract the learned weights from the hc_tf
         #w_tf_hc = manual_weight_extraction(hc_tf, Z_0, d)
         #v_tf_hc = w_tf_hc.t() @ phi_query
+        # 2. compute the value function using the hc_tf using a forward pass
         v_out, _ = hc_tf.forward(Z_0)
-        v_tf_hc = v_out[-1]
+        v_tf_hc = v_out[-1] # TODO: we have some numerial instability issue here???
+
+        # 3. compute the value function using the implemented TD batch update
+        w_manual = torch.zeros((d, 1))
+        for _ in range(l):
+            w_manual, v_manual = pro.td_update(w_manual) #no preconditioning
         #assert round(v_tf_hc.item(),2) == round(v_tf_hc2[-1],2) # sanity check on the hardcoded transformer
+        #import pdb; pdb.set_trace()
 
         if i % log_interval == 0:
-            import pdb; pdb.set_trace()
             xs.append(i)
             mstdes.append(mstde.item())
             wes.append(weight_error_norm(w_tf, true_w).item())
             ves.append(value_error(v_tf, true_v).item())
-            hc_ves.append(value_error(v_tf_hc,true_v).item()) # compare prediction error between the  hardcoded TD tf and the ground truth
-            hc_train_ves.append(value_error(v_tf_hc, v_tf).item()) # compare prediction error between the learned tf with the hardcoded TD tf
+            hc_ves.append(value_error(v_manual,true_v).item()) # compare VE btw hc_tf and the ground truth
+            hc_train_ves.append(value_error(v_manual, v_tf).item()) # compare prediction error between the learned tf with the hc_TD tf
 
             print('Epoch:', i)
             print('Transformer Learned Weight:\n', w_tf.detach().numpy())
@@ -104,8 +111,8 @@ if __name__ == '__main__':
     torch.manual_seed(5)
     np.random.seed(5)
     d = 4
-    n = 300
-    l = 10
+    n = 250
+    l = 6
     train(d, n, l)
 
     # TODO:

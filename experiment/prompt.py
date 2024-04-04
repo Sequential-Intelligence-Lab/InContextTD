@@ -1,4 +1,20 @@
 import torch
+#from experiment.boyan import BoyanChain
+import numpy as np
+
+class Feature:
+    def __init__(self, d:int, s:int):
+        '''
+        d: dimension of the feature vector
+        s: number of states
+        
+        '''
+        self.d = d
+        self.s= s
+        self.phi = np.random.randn(s,d)
+
+    def get_feature(self, s:int):
+        return self.phi[s]
 
 class Prompt:
     def __init__(self, 
@@ -17,7 +33,6 @@ class Prompt:
         self.d = d
         self.n = n
         self.gamma = gamma
-
         self.phi = torch.randn(d, n+1)
 
         phi_prime = torch.randn(d, n)
@@ -55,25 +70,40 @@ class Prompt:
         new_w = w + u 
         v = new_w.t() @ self.phi[:, [-1]]
         return new_w, v.item()
+    
+class MDP_Prompt:
+    def __init__(self,
+                 mdp: BoyanChain,
+                 features: Feature,
+                 n: int,
+                 gamma: float):
+        '''
+        mdp: an instance of a BoyanChain MDP
+        features: the features
+        n: context length
+        
+        '''
+        self.mdp = mdp
+        self.features = features
+        self.n = n
+        self.gamma = gamma
 
+
+        # sample from initial state distribution
+        s = mdp.reset()
+        for _ in range(self.n-1):
+            s_prime, r = mdp.step(s)
+            column = np.concatenate([features.get_feature(s), features.get_feature(s_prime),r], axis=1).reshape(-1,1)
+
+        self.z_0 = torch.tensor(np.transpose(context))
+
+        
 if __name__ == '__main__':
-    import matplotlib.pyplot as plt
-    weight_diffs = []
-    value_diffs = []
     d = 3
+    s = 5
     n = 20
     gamma = 0.9
-    pro = Prompt(d, n, gamma)
-    true_w = pro.w
-    true_v = true_w.t() @ pro.phi[:, [-1]]
-    w = torch.zeros((d, 1))
-    for _ in range(100):
-        w, v = pro.td_update(w)
-        weight_diffs.append(torch.norm(w - true_w).item())
-        value_diffs.append(abs((v - true_v).item()))
-    
-    plt.plot(weight_diffs, label='Weight Difference')
-    plt.plot(value_diffs, label='Value Difference')
-    plt.legend()
-    plt.show()
-    plt.close()
+    feat = Feature(d, s)
+    print(feat.phi)
+    print(feat.get_feature(2))
+    import pdb; pdb.set_trace()
