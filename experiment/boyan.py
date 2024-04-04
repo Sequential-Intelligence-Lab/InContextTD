@@ -19,9 +19,9 @@ class BoyanChain:
         return s
     
     def step(self, state: int) -> Tuple[int, float]:
-        assert 0 < state < self.n_states
+        assert 0 <= state < self.n_states
         next_state = np.random.choice(self.n_states, p=self.P[state])
-        reward = self.r[next_state, 0]
+        reward = self.r[state, 0]
         return next_state, reward
 
 
