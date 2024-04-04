@@ -14,11 +14,11 @@ def train(d: int,
           l: int,
           gamma: float = 0.9,
           lmbd: float = 0.0,
-          lr: float = 0.001,
+          lr: float = 0.0003,
           epochs: int = 10_000,
           log_interval: int = 100):
 
-    tf = LinearTransformer(d, n, l, lmbd, mode='auto')
+    tf = LinearTransformer(d, n, l, lmbd, mode='sequential')
     opt = optim.Adam(tf.parameters(), lr=lr, weight_decay=1e-5)
 
     xs = []
@@ -70,9 +70,9 @@ def train(d: int,
 
 
 if __name__ == '__main__':
-    torch.manual_seed(1)
-    np.random.seed(1)
+    torch.manual_seed(2)
+    np.random.seed(2)
     d = 5
-    n = 200
-    l = 4
-    train(d, n, l, epochs=30000)
+    n = 400
+    l = 8
+    train(d, n, l, lmbd=0.0, epochs=10000)
