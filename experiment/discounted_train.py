@@ -18,8 +18,7 @@ def train(d: int,
           lmbd: float = 0.0,
           lr: float = 0.001,
           epochs: int = 50_000,
-          log_interval: int = 200,
-          mdp_train: bool = True):
+          log_interval: int = 250):
 
     tf = LinearTransformer(d, n, l, lmbd, mode='sequential')
     opt = optim.Adam(tf.parameters(), lr=lr, weight_decay=1e-5)
@@ -31,24 +30,22 @@ def train(d: int,
 
     xs = [] # epochs
     mstdes = [] # mean squared td errors
-    wes = [] # weight error norms
+    msves = [] # mean squared value errors
+    mspbes = [] # mean squared projected bellman errors
     ves = [] # value errors (absolute difference between true and learned tf predicted value)
-    hc_ves = [] # value errors (absolute difference between true and hardcoded tf predicted value)
-    hc_train_ves = [] # value errors (absolute difference between learned and hardcoded tf predicted value)
+    w_msve_error = [] # weight error norms between learned tf and the tf that minimizes MSVE
+    w_mspbe_error = [] # weight error norms between learned tf and the tf that minimizes MSPBE
+
     for i in range(epochs): 
         #generate a new prompt
-        if mdp_train:
-            boyan_mdp = BoyanChain(s, gamma)
-            pro =  MDP_Prompt(boyan_mdp, features, n, gamma)   # Markovian prompt based prompt from Boyan Chain
-        else:
-            pro = Prompt(d, n, gamma, noise=0.0) # IID promopt
+        boyan_mdp = BoyanChain(s, gamma, noise=0.0)
+        pro =  MDP_Prompt(boyan_mdp, features, n, gamma)   # Markovian prompt based prompt from Boyan Chain
 
         Z_0 = pro.z()
         phi_query = Z_0[:d, [n]]
 
         # extract the learned weights from the transformer
         w_tf = manual_weight_extraction(tf, Z_0, d)
-        v_tf = w_tf.t() @ phi_query
 
         mstde = mean_squared_td_error(w_tf, Z_0, d, n)
 
@@ -59,20 +56,16 @@ def train(d: int,
 
         if i % log_interval == 0:
             # Compare the learned weight with true weight value predictions
-            if mdp_train:
-                w_msve, msve = solve_msve(boyan_mdp.P, features.phi, boyan_mdp.v)
-                w_mspbe, mspbe = solve_mspbe(boyan_mdp.P, features.phi, boyan_mdp.r, boyan_mdp.gamma)
+            w_msve, msve = solve_msve(boyan_mdp.P, features.phi, boyan_mdp.v)
+            w_mspbe, mspbe = solve_mspbe(boyan_mdp.P, features.phi, boyan_mdp.r, boyan_mdp.gamma)
 
-                true_w = torch.tensor(w_msve, dtype=torch.float32)
-                true_v = true_w.t() @ phi_query
-            else:
-                #get the true value
-                true_w = pro.w
-                true_v = true_w.t() @ phi_query
+            w_msve = torch.tensor(w_msve, dtype=torch.float32)
+            w_mspbe = torch.tensor(w_mspbe, dtype=torch.float32)
             
+            # TODO: Compare with Batch TD
             # 1. compute the hc_tf predicted valule function
             #v_out, _ = hc_tf.forward(Z_0)
-            #v_tf_hc = v_out[-1] # TODO: we have some numerial instability issue here???
+            #v_tf_hc = v_out[-1] 
 
             # 2. compute the value function using l batch TD updates
             # TODO: implement td_update for the MDP_Prompt class
@@ -82,38 +75,47 @@ def train(d: int,
 
             xs.append(i)
             mstdes.append(mstde.item())
-            wes.append(weight_error_norm(w_tf, true_w).item())
-            ves.append(value_error(v_tf, true_v).item())
+            msves.append(msve)
+            mspbes.append(mspbe)
+            w_msve_error.append(weight_error_norm(w_tf, w_msve).item())
+            w_mspbe_error.append(weight_error_norm(w_tf, w_mspbe).item())
+            #ves.append(value_error(v_tf, true_v).item())
             #hc_ves.append(value_error(v_manual,true_v).item()) # compare VE btw hc_tf and the ground truth
             #hc_train_ves.append(value_error(v_manual, v_tf).item()) # compare prediction error between the learned tf with the hc_TD tf
 
             print('Epoch:', i)
             print('Transformer Learned Weight:\n', w_tf.detach().numpy())
-            print('True Weight:\n', true_w.numpy())
+            print('MVSE Minimizer:\n', w_msve.numpy())
+            print('MSPBE Minimizer:\n', w_mspbe.numpy())
 
     xs.append(epochs)
     mstdes.append(mstde.item())
-    wes.append(weight_error_norm(w_tf, true_w).item())
-    ves.append(value_error(v_tf, true_v).item())
+    msves.append(msve)
+    mspbes.append(mspbe)
+    w_msve_error.append(weight_error_norm(w_tf, w_msve).item())
+    w_mspbe_error.append(weight_error_norm(w_tf, w_mspbe).item())
+    #ves.append(value_error(v_tf, true_v).item())
     #hc_ves.append(value_error(true_v, v_manual).item())
     #hc_train_ves.append(value_error(v_tf, v_manual).item())
 
     print('Transformer Learned Weight:\n', w_tf.detach().numpy())
     plt.figure()
-    plt.title('Learned Transformer vs Ground Truth')
-    plt.yscale('log')
-    plt.plot(xs, mstdes, label='Mean Squared TD Error')
-    plt.plot(xs, wes, label='Weight(w) Error Norm')
-    plt.plot(xs, ves, label='Absolute Value Error (vs True Value)')
-    plt.plot(xs, hc_train_ves, label='AVE (Learned TF vs HC)')
+    plt.title('Learned Transformer Weights vs MSVE and MSPBE Minimizing Weights')
+    #plt.yscale('log')
+    plt.plot(xs, w_msve_error, label='Weight(w) Error Norm (MSVE)')
+    plt.plot(xs, w_mspbe_error, label='Weight(w) Error Norm (MSPBE)')
+    #plt.plot(xs, ves, label='Absolute Value Error (vs True Value)')
+    #plt.plot(xs, hc_train_ves, label='AVE (Learned TF vs HC)')
     plt.grid()
     plt.legend()
     plt.show()
 
     plt.figure()
-    plt.title('Learned Transformer vs Hardcoded Transformer')
-    plt.yscale('log')
-    plt.plot(xs, hc_ves, label='AVE (HC vs Ground Truth)')
+    plt.title('Learned Transformer Performance')
+    #plt.yscale('log')
+    plt.plot(xs, mstdes, label='Mean Squared TD Error')
+    #plt.plot(xs, msves, label='Mean Squared Value Error')
+    #plt.plot(xs, mspbes, label='Mean Squared Projected Bellman Error')
     plt.grid()
     plt.legend()
     plt.show()
@@ -122,7 +124,7 @@ if __name__ == '__main__':
     torch.manual_seed(2)
     np.random.seed(2)
     d = 5
-    n = 200
+    n = 300
     l = 6
-    s= n # number of states equal to the context length
-    train(d, s, n, l, lmbd=0.0, epochs=10000 , mdp_train = True)
+    s= int(n/4) # number of states equal to the context length
+    train(d, s, n, l, lmbd=0.0, epochs=100_000)
