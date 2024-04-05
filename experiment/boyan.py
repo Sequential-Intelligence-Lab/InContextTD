@@ -1,10 +1,12 @@
 import numpy as np
 from typing import Tuple
+from experiment.utils import compute_steady_dist
 
 class BoyanChain:
-    def __init__(self, n_states: int, gamma: float = 0.9) -> None:
+    def __init__(self, n_states: int, gamma: float = 0.9, noise: float = 0.1) -> None:
         self.n_states = n_states
         self.gamma = gamma
+        self.noise = noise
         self.P = np.zeros((n_states, n_states))
         for i in range(n_states - 2):
             self.P[i, i + 1] = 0.5
@@ -14,6 +16,8 @@ class BoyanChain:
         self.v = np.random.randn(n_states).reshape(n_states, 1)
         self.r = (np.eye(n_states) - gamma * self.P).dot(self.v)
         self.mu = np.ones(n_states) / n_states # uniform intial distribution
+        assert np.allclose(self.P.sum(axis=1), 1)
+        self.stationary_d = compute_steady_dist(self.P)
     
     def reset(self) -> int:
         s = np.random.choice(self.n_states, p=self.mu)
@@ -22,7 +26,7 @@ class BoyanChain:
     def step(self, state: int) -> Tuple[int, float]:
         assert 0 <= state < self.n_states
         next_state = np.random.choice(self.n_states, p=self.P[state])
-        reward = self.r[state, 0]
+        reward = self.r[state, 0] + self.noise * np.random.randn() # add Gaussian noise
         return next_state, reward
 
 

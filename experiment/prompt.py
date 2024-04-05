@@ -1,6 +1,7 @@
 import torch
 from experiment.boyan import BoyanChain
 import numpy as np
+import random
 
 class Feature:
     def __init__(self, d:int, s:int):
@@ -22,7 +23,7 @@ class Prompt:
                  n: int,
                  gamma: float, 
                  w: torch.Tensor = None,
-                 noise: float = 0.0):
+                 noise: float = 0.1):
         '''
         d: feature dimension
         n: context length
@@ -99,7 +100,7 @@ class MDP_Prompt:
         
         # randomly sample a query state from the initial state distribution
         rows.append(np.concatenate([features.get_feature(mdp.reset()), np.zeros(features.d), [0]]))
-        # TODO: do we want to also shuffle the rows or can we preserve the order?
+        random.shuffle(rows)
         context = np.stack(rows, axis=-1)
         self.z_0 = torch.tensor(context, dtype=torch.float32)
 
