@@ -4,22 +4,26 @@ import torch
 import torch.optim as optim
 
 from experiment.model import LinearTransformer
-from experiment.prompt import Prompt
-from experiment.utils import manual_weight_extraction
+from experiment.prompt import Prompt, Feature, MDP_Prompt
+from experiment.utils import manual_weight_extraction, solve_mspbe, solve_msve
 from experiment.loss import mean_squared_td_error, weight_error_norm, value_error
 from torch_in_context_td import HC_Transformer
+from experiment.boyan import BoyanChain
 
 def train(d: int,
+          s: int,
           n: int,
           l: int,
           gamma: float = 0.9,
           lmbd: float = 0.0,
           lr: float = 0.001,
           epochs: int = 50_000,
-          log_interval: int = 200):
+          log_interval: int = 200,
+          mdp_train: bool = True):
 
     tf = LinearTransformer(d, n, l, lmbd, mode='sequential')
     opt = optim.Adam(tf.parameters(), lr=lr, weight_decay=1e-5)
+    features = Feature(d,s)
 
     # Transformer with hardcoded weights according to our analytical TD update
     # whats the TD learning rate for our case?
@@ -33,13 +37,14 @@ def train(d: int,
     hc_train_ves = [] # value errors (absolute difference between learned and hardcoded tf predicted value)
     for i in range(epochs): 
         #generate a new prompt
-        pro = Prompt(d, n, gamma, noise=0.0)
+        if mdp_train:
+            boyan_mdp = BoyanChain(s, gamma)
+            pro =  MDP_Prompt(boyan_mdp, features, n, gamma)   # Markovian prompt based prompt from Boyan Chain
+        else:
+            pro = Prompt(d, n, gamma, noise=0.0) # IID promopt
+
         Z_0 = pro.z()
         phi_query = Z_0[:d, [n]]
-
-        #get the true value
-        true_w = pro.w
-        true_v = true_w.t() @ phi_query
 
         # extract the learned weights from the transformer
         w_tf = manual_weight_extraction(tf, Z_0, d)
@@ -52,29 +57,35 @@ def train(d: int,
         total_loss.backward(retain_graph=True) # how does this backward work here if we extract w_tf manually? 
         opt.step()
 
-        # Compare the learned weight with the hardcoded TD weight value predictions (3 ways to compute the same thing for sanity check)
-
-        # 1. extract the learned weights from the hc_tf
-        #w_tf_hc = manual_weight_extraction(hc_tf, Z_0, d)
-        #v_tf_hc = w_tf_hc.t() @ phi_query
-        # 2. compute the value function using the hc_tf using a forward pass
-        v_out, _ = hc_tf.forward(Z_0)
-        v_tf_hc = v_out[-1] # TODO: we have some numerial instability issue here???
-
-        # 3. compute the value function using the implemented TD batch update
-        w_manual = torch.zeros((d, 1))
-        for _ in range(l):
-            w_manual, v_manual = pro.td_update(w_manual) #no preconditioning
-        #assert round(v_tf_hc.item(),2) == round(v_tf_hc2[-1],2) # sanity check on the hardcoded transformer
-        #import pdb; pdb.set_trace()
-
         if i % log_interval == 0:
+            # Compare the learned weight with true weight value predictions
+            if mdp_train:
+                w_msve, msve = solve_msve(boyan_mdp.P, features.phi, boyan_mdp.v)
+                w_mspbe, mspbe = solve_mspbe(boyan_mdp.P, features.phi, boyan_mdp.r, boyan_mdp.gamma)
+
+                true_w = torch.tensor(w_msve, dtype=torch.float32)
+                true_v = true_w.t() @ phi_query
+            else:
+                #get the true value
+                true_w = pro.w
+                true_v = true_w.t() @ phi_query
+            
+            # 1. compute the hc_tf predicted valule function
+            #v_out, _ = hc_tf.forward(Z_0)
+            #v_tf_hc = v_out[-1] # TODO: we have some numerial instability issue here???
+
+            # 2. compute the value function using l batch TD updates
+            # TODO: implement td_update for the MDP_Prompt class
+            #w_manual = torch.zeros((d, 1))
+            #for _ in range(l):
+            #    w_manual, v_manual = pro.td_update(w_manual) #no preconditioning
+
             xs.append(i)
             mstdes.append(mstde.item())
             wes.append(weight_error_norm(w_tf, true_w).item())
             ves.append(value_error(v_tf, true_v).item())
-            hc_ves.append(value_error(v_manual,true_v).item()) # compare VE btw hc_tf and the ground truth
-            hc_train_ves.append(value_error(v_manual, v_tf).item()) # compare prediction error between the learned tf with the hc_TD tf
+            #hc_ves.append(value_error(v_manual,true_v).item()) # compare VE btw hc_tf and the ground truth
+            #hc_train_ves.append(value_error(v_manual, v_tf).item()) # compare prediction error between the learned tf with the hc_TD tf
 
             print('Epoch:', i)
             print('Transformer Learned Weight:\n', w_tf.detach().numpy())
@@ -84,8 +95,8 @@ def train(d: int,
     mstdes.append(mstde.item())
     wes.append(weight_error_norm(w_tf, true_w).item())
     ves.append(value_error(v_tf, true_v).item())
-    hc_ves.append(value_error(true_v, v_tf_hc).item())
-    hc_train_ves.append(value_error(v_tf, v_tf_hc).item())
+    #hc_ves.append(value_error(true_v, v_manual).item())
+    #hc_train_ves.append(value_error(v_tf, v_manual).item())
 
     print('Transformer Learned Weight:\n', w_tf.detach().numpy())
     plt.figure()
@@ -111,6 +122,7 @@ if __name__ == '__main__':
     torch.manual_seed(2)
     np.random.seed(2)
     d = 5
-    n = 400
-    l = 8
-    train(d, n, l, lmbd=0.0, epochs=10000)
+    n = 200
+    l = 6
+    s= n # number of states equal to the context length
+    train(d, s, n, l, lmbd=0.0, epochs=10000 , mdp_train = True)

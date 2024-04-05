@@ -101,9 +101,9 @@ class MDP_Prompt:
         rows.append(np.concatenate([features.get_feature(mdp.reset()), np.zeros(features.d), [0]]))
         # TODO: do we want to also shuffle the rows or can we preserve the order?
         context = np.stack(rows, axis=-1)
-        self.z_0 = torch.tensor(context, dtype=torch.float64)
+        self.z_0 = torch.tensor(context, dtype=torch.float32)
 
-    def get_prompt(self):
+    def z(self):
         return self.z_0
 
 if __name__ == '__main__':
