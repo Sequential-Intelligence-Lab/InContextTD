@@ -79,7 +79,7 @@ def solve_msve(P: np.ndarray,
     steady_dist = compute_steady_dist(P)
     D = np.diag(steady_dist)
     w = np.linalg.inv(X.T @ D @ X) @ X.T @ D @ v
-    msve = (X @ w - v).T @ D @ (X @ w - v)
+    msve = np.sqrt((X @ w - v).T @ D @ (X @ w - v))
     return w, msve.item()
 
 
@@ -105,7 +105,7 @@ def solve_mspbe(P: np.ndarray,
     projection = X @ np.linalg.inv(X.T @ D @ X) @ X.T @ D
     v_hat = X @ w
     pbe = projection @ (r + gamma * P @ v_hat) - v_hat
-    mspde = pbe.T @ D @ pbe # this quantity should be very close to zero because td fixed point brings MSPBE to zero
+    mspde = np.sqrt(pbe.T @ D @ pbe) # this quantity should be very close to zero because td fixed point brings MSPBE to zero
 
     return w, mspde.item()
 
@@ -117,6 +117,5 @@ if __name__ == '__main__':
     X = np.random.randn(10, 3)
     w_msve, msve = solve_msve(bc.P, X, bc.v)
     print(w_msve, msve)
-
     w_mspbe, mspbe = solve_mspbe(bc.P, X, bc.r, bc.gamma)
     print(w_mspbe, mspbe)
