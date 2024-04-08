@@ -59,7 +59,7 @@ class LinearTransformer(nn.Module):
             for attn in self.layers:
                 Z = attn(Z)
         
-        return -Z[-1, -1].item(), Z
+        return Z
 
 
 if __name__ == '__main__':
