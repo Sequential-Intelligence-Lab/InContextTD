@@ -23,6 +23,19 @@ def mean_squared_td_error(w: torch.tensor,
     mstde = torch.mean(tde_vec**2, dim=1)
     return mstde
 
+def self_consistency_loss(w_tf: torch.tensor, 
+                          phi_query: torch.tensor, 
+                          Z_tf: torch.tensor):
+    '''
+    w_tf: weight vector extracted from the transformer (d, 1)
+    phi_query: query vector (d, 1)
+    Z_tf: transformer prompt (2d+1, n)
+    '''
+    w_tf = w_tf.detach()
+    v_tf = -Z_tf[-1, -1]
+    return torch.square(w_tf.t() @ phi_query - v_tf)
+
+
 def weight_error_norm(w1: torch.tensor,
                       w2: torch.tensor):
     '''
