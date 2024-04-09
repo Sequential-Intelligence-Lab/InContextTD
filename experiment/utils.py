@@ -117,7 +117,7 @@ def solve_mspbe_weight(steady_dist: np.ndarray,
     return w
 
 
-def compute_MSPBE(w: np.ndarray,
+def compute_mspbe(w: np.ndarray,
                   steady_dist: np.ndarray,
                   P: np.ndarray,
                   X: np.ndarray,
@@ -152,5 +152,5 @@ if __name__ == '__main__':
     print('MSVE\n', msve)
     w_mspbe = solve_mspbe_weight(bc.steady_d, bc.P, X, bc.r, bc.gamma)
     print('MSPBE Weight\n', w_mspbe)
-    mspbe = compute_MSPBE(w_mspbe, bc.steady_d, bc.P, X, bc.r, bc.gamma)
+    mspbe = compute_mspbe(w_mspbe, bc.steady_d, bc.P, X, bc.r, bc.gamma)
     print('MSPBE\n', mspbe)
