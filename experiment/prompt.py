@@ -103,17 +103,20 @@ class MDP_Prompt:
         q_state = mdp.sample_stationary()
         rows.append(np.concatenate([features.get_feature(q_state), np.zeros(features.d), [0]]))
 
-        context = np.stack(rows, axis=-1)
-        self.z_0 = torch.tensor(context, dtype=torch.float32)
+        prompt = np.stack(rows, axis=-1)
+        self.z_0 = torch.tensor(prompt, dtype=torch.float32)
 
     def z(self):
         return self.z_0
+    
+    def context(self):
+        return self.z_0[:, :-1]
 
 
 if __name__ == '__main__':
     d = 3
     s = 10
-    n = 7
+    n = 6
     gamma = 0.9
     feat = Feature(d, s)
     bc = BoyanChain(s, gamma)
@@ -122,5 +125,7 @@ if __name__ == '__main__':
     print("Features")
     print(feat.phi)
     print("Z_0")
-    print(mdp_prompt.z_0)
+    print(mdp_prompt.z())
+    print("Context")
+    print(mdp_prompt.context())
     assert mdp_prompt.z_0.shape == (2*d+1, n+1)
