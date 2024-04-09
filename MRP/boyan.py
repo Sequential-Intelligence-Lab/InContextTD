@@ -33,7 +33,7 @@ class BoyanChain(MRP):
         self.P[-2, -1] = 1.0
         self.P[-1, :] = 1/n_states
         assert np.allclose(self.P.sum(axis=1), 1)
-        self.stationary_d = compute_steady_dist(self.P)
+        self.steady_d = compute_steady_dist(self.P)
 
         if initial_dist is not None:
             self.mu = initial_dist
@@ -63,7 +63,7 @@ class BoyanChain(MRP):
         return next_state, reward
     
     def sample_stationary(self) -> int:
-        return np.random.choice(self.n_states, p=self.stationary_d)
+        return np.random.choice(self.n_states, p=self.steady_d)
 
 
 if __name__ == '__main__':
@@ -73,4 +73,4 @@ if __name__ == '__main__':
     print('weight\n', bc.w)
     print('reward\n', bc.r)
     print('value\n', bc.v)
-    print('stationary distribution\n', bc.stationary_d)
+    print('stationary distribution\n', bc.steady_d)
