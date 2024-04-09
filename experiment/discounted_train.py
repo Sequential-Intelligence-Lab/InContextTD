@@ -86,7 +86,7 @@ def train(d: int,
         w_tf = manual_weight_extraction(tf, Z_0, d)
 
         mstde = mean_squared_td_error(w_tf, Z_0, d, n)
-        sc_loss = self_consistency_loss(w_tf, phi_query, Z_0)
+        sc_loss = self_consistency_loss(tf, w_tf, pro.context(), features.phi, boyan_mdp.steady_d)
 
         opt.zero_grad()
         total_loss = mstde + sc_loss
