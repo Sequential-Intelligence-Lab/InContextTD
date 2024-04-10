@@ -12,20 +12,17 @@ class LinearAttention(nn.Module):
         self.d = d
         self.n = n
         self.lmbd = lmbd
-
+        M = torch.eye(n+1)
+        for col in range(n):
+            for row in range(col+1, n):
+                M[row, col] = self.lmbd*M[row-1, col]
+        M[-1, -1] = 0
+        self.M = M
         self.P = nn.Parameter(torch.empty(2 * d + 1, 2 * d + 1))
         self.Q = nn.Parameter(torch.empty(2 * d + 1, 2 * d + 1))
 
     def forward(self, Z):
-        h = Z.shape[1]
-        # dynamic masking
-        M = torch.eye(h)
-        for col in range(self.n):
-            for row in range(col+1, self.n):
-                M[row, col] = self.lmbd*M[row-1, col]
-        for i in range(self.n, h):
-            M[i, i] = 0
-        return Z + 1.0 / self.n * self.P @ Z @ M @ Z.T @ self.Q @ Z
+        return Z + 1.0 / self.n * self.P @ Z @ self.M @ Z.T @ self.Q @ Z
 
 
 class LinearTransformer(nn.Module):
