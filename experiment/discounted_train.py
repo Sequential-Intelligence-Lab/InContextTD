@@ -252,7 +252,7 @@ if __name__ == '__main__':
     #l = 4
     #s = int(n/10)  # number of states equal to the context length
     for l in [1,2,4,6]:
-        for s_frac in [2,4,6,10]:
+        for s_frac in [10, 15, 20]:
             for sw in [True, False]:
                 s = int(n/s_frac)
                 train(d, s, n, l, lmbd=0.0, sample_weight=sw, steps=25_000, 
