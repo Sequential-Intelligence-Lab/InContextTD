@@ -94,7 +94,6 @@ def train(d: int,
     else:
         save_dir = os.path.join('./logs', "discounted_train", save_dir)
     
-    print(save_dir)
     tf = LinearTransformer(d, n, l, lmbd, mode='auto')
     opt = optim.Adam(tf.parameters(), lr=lr, weight_decay=weight_decay)
     features = Feature(d, s)
@@ -201,6 +200,22 @@ def train(d: int,
     # Save log dictionary as JSON
     with open(os.path.join(save_dir, 'params.json'), 'w') as f:
         json.dump(hyperparameters, f)
+    
+    # Save the final P and Q matrices
+    final_P = tf.attn.P.detach().numpy()
+    final_Q = tf.attn.Q.detach().numpy()
+
+    plt.figure()
+    plt.matshow(final_P)
+    plt.colorbar()
+    plt.title('Final P Matrix')
+    plt.savefig(os.path.join(save_dir, 'final_P.png'), dpi=300)
+
+    plt.figure()
+    plt.matshow(final_Q)
+    plt.colorbar()
+    plt.title('Final Q Matrix')
+    plt.savefig(os.path.join(save_dir, 'final_Q.png'), dpi=300)
 
     plot_data(log, save_dir)
 
@@ -244,16 +259,26 @@ def plot_data(log,save_dir):
     plt.legend()
     plt.savefig(os.path.join(save_dir,'mspbe.png'), dpi=300)
 
-if __name__ == '__main__':
+def run_hyperparam_search():
     torch.manual_seed(2)
     np.random.seed(2)
     d = 5
     n = 200
     #l = 4
     #s = int(n/10)  # number of states equal to the context length
+    s_frac = 10
     for l in [1,2,4,6]:
-        for s_frac in [2,4,6,10]:
-            for sw in [True, False]:
-                s = int(n/s_frac)
-                train(d, s, n, l, lmbd=0.0, sample_weight=sw, steps=25_000, 
-                      log_interval=250,save_dir='l{layer}_s{s_}_sw{samp_w}'.format(layer=l, s_=s, samp_w=sw))
+        for sw in [True, False]:
+            s = int(n/s_frac)
+            train(d, s, n, l, lmbd=0.0, sample_weight=sw, steps=25_000, 
+                    log_interval=250,save_dir='l{layer}_s{s_}_sw{samp_w}'.format(layer=l, s_=s, samp_w=sw))
+
+if __name__ == '__main__':
+    torch.manual_seed(2)
+    np.random.seed(2)
+    d = 5
+    n = 200
+    l = 3
+    s = int(n/10) 
+    train(d, s, n, l, lmbd=0.0, sample_weight=False, steps=20_000, 
+        log_interval=50)

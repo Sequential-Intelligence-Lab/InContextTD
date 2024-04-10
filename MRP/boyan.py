@@ -10,7 +10,6 @@ class BoyanChain(MRP):
     def __init__(self,
                  n_states: int,
                  gamma: float = 0.9,
-                 noise: float = 0.1,
                  initial_dist: np.array = None,
                  weight: np.array = None,
                  X: np.array = None) -> None:
@@ -23,13 +22,13 @@ class BoyanChain(MRP):
         super().__init__(n_states)
         # common attributes for all variants
         self.gamma = gamma
-        self.noise = noise
 
         # initialze transition matrix
         self.P = np.zeros((n_states, n_states))
         for i in range(n_states - 2):
-            self.P[i, i + 1] = 0.5
-            self.P[i, i + 2] = 0.5
+            trans_sample = np.random.uniform(0.01, 0.99)
+            self.P[i, i + 1] = trans_sample
+            self.P[i, i + 2] = 1-trans_sample
         self.P[-2, -1] = 1.0
         self.P[-1, :] = 1/n_states
         assert np.allclose(self.P.sum(axis=1), 1)
@@ -47,7 +46,7 @@ class BoyanChain(MRP):
             self.v = X.dot(self.w)
             self.r = (np.eye(n_states) - gamma * self.P).dot(self.v)
         else:
-            self.r = np.random.randn(n_states, 1)
+            self.r = np.random.uniform(low=0.01, high=0.99, size=(n_states, 1))
             self.v = np.linalg.inv(
                 np.eye(n_states) - gamma * self.P).dot(self.r)
 
@@ -58,8 +57,7 @@ class BoyanChain(MRP):
     def step(self, state: int) -> Tuple[int, float]:
         assert 0 <= state < self.n_states
         next_state = np.random.choice(self.n_states, p=self.P[state])
-        reward = self.r[state, 0] + self.noise * \
-            np.random.randn()  # add Gaussian noise
+        reward = self.r[state, 0]
         return next_state, reward
     
     def sample_stationary(self) -> int:
