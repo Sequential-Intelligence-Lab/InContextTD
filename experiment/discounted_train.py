@@ -14,6 +14,7 @@ from experiment.utils import (compute_mspbe, compute_msve,
                               manual_weight_extraction, solve_mspbe_weight,
                               solve_msve_weight)
 from MRP.boyan import BoyanChain
+import os
 
 
 
@@ -71,7 +72,8 @@ def train(d: int,
           lr: float = 0.001,
           weight_decay=1e-6,
           steps: int = 50_000,
-          log_interval: int = 100):
+          log_interval: int = 100,
+          save_dir: str = None):
     '''
     d: feature dimension
     s: number of states
@@ -85,7 +87,14 @@ def train(d: int,
     steps: number of training steps
     log_interval: logging interval
     '''
-    startTime = datetime.datetime.now()
+
+    if save_dir is None:
+        startTime = datetime.datetime.now()
+        save_dir = os.path.join('./logs', "discounted_train", startTime.strftime("%Y-%m-%d-%H-%M-%S"))
+    else:
+        save_dir = os.path.join('./logs', "discounted_train", save_dir)
+    
+    print(save_dir)
     tf = LinearTransformer(d, n, l, lmbd, mode='auto')
     opt = optim.Adam(tf.parameters(), lr=lr, weight_decay=weight_decay)
     features = Feature(d, s)
@@ -168,11 +177,13 @@ def train(d: int,
     print('MSVE Weight:\n', w_msve)
     print('MSPBE Weight:\n', w_mspbe)
 
-    save_dir = './logs/discounted_train/'+str(startTime)+'/'
+    # Create directory if it doesn't exist
+    if not os.path.exists(save_dir):
+        os.makedirs(save_dir)
 
-    with open(save_dir+'discounted_train.pkl', 'wb') as f:
+    with open(os.path.join(save_dir,'discounted_train.pkl'), 'wb') as f:
         pickle.dump(log, f)
-    
+
     hyperparameters = {
         'd': d,
         's': s,
@@ -188,7 +199,7 @@ def train(d: int,
     }
 
     # Save log dictionary as JSON
-    with open(save_dir+'params.json', 'w') as f:
+    with open(os.path.join(save_dir, 'params.json'), 'w') as f:
         json.dump(hyperparameters, f)
 
     plot_data(log, save_dir)
@@ -202,7 +213,7 @@ def plot_data(log,save_dir):
     plt.ylabel('Loss')
     plt.title('Loss vs Steps')
     plt.legend()
-    plt.savefig(save_dir+'loss_mstde.png')
+    plt.savefig(os.path.join(save_dir,'loss_mstde.png'), dpi= 300)
 
     # Weight norm plot
     plt.figure()
@@ -212,7 +223,7 @@ def plot_data(log,save_dir):
     plt.ylabel('Weight Error L2 Norm')
     plt.title('Weight Error Norm vs Steps')
     plt.legend()
-    plt.savefig(save_dir+'weight_error_norm.png')
+    plt.savefig(os.path.join(save_dir,'weight_error_norm.png'),dpi=300)
 
     # Value Error Plot
     plt.figure()
@@ -222,7 +233,7 @@ def plot_data(log,save_dir):
     plt.ylabel('MSVE')
     plt.title('MSVE vs Steps')
     plt.legend()
-    plt.savefig(save_dir+'msve.png')
+    plt.savefig(os.path.join(save_dir,'msve.png'),dpi=300)
 
     # MSPBE Plot
     plt.figure()
@@ -231,13 +242,18 @@ def plot_data(log,save_dir):
     plt.ylabel('MSPBE')
     plt.title('MSPBE vs Steps')
     plt.legend()
-    plt.savefig(save_dir+'mspbe.png')
+    plt.savefig(os.path.join(save_dir,'mspbe.png'), dpi=300)
 
 if __name__ == '__main__':
     torch.manual_seed(2)
     np.random.seed(2)
-    d = 4
+    d = 5
     n = 200
-    l = 4
-    s = int(n/10)  # number of states equal to the context length
-    train(d, s, n, l, lmbd=0.0, sample_weight=True, steps=50_000)
+    #l = 4
+    #s = int(n/10)  # number of states equal to the context length
+    for l in [1,2,4,6]:
+        for s_frac in [2,4,6,10]:
+            for sw in [True, False]:
+                s = int(n/s_frac)
+                train(d, s, n, l, lmbd=0.0, sample_weight=sw, steps=25_000, 
+                      log_interval=250,save_dir='l{layer}_s{s_}_sw{samp_w}'.format(layer=l, s_=s, samp_w=sw))
