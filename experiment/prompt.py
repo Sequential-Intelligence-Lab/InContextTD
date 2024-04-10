@@ -47,7 +47,6 @@ class Prompt:
             self.w = torch.randn((d, 1))
 
         r = self.w.t() @ self.phi - self.w.t() @ self.phi_prime
-        r += noise * torch.randn((1, n+1))  # add random noise
         r[0, -1] = 0
         self.r = r
 
