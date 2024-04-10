@@ -253,7 +253,7 @@ if __name__ == '__main__':
     #s = int(n/10)  # number of states equal to the context length
     for l in [1,2,4,6]:
         for s_frac in [10, 15, 20]:
-            for sw in [True, False]:
+            for sw in [False]:
                 s = int(n/s_frac)
                 train(d, s, n, l, lmbd=0.0, sample_weight=sw, steps=25_000, 
                       log_interval=250,save_dir='l{layer}_s{s_}_sw{samp_w}'.format(layer=l, s_=s, samp_w=sw))
