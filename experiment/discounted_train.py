@@ -240,4 +240,4 @@ if __name__ == '__main__':
     n = 200
     l = 4
     s = int(n/10)  # number of states equal to the context length
-    train(d, s, n, l, lmbd=0.0, sample_weight=False, steps=10_000)
+    train(d, s, n, l, lmbd=0.0, sample_weight=True, steps=50_000)
