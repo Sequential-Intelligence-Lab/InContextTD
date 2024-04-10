@@ -4,6 +4,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 import torch
 import torch.optim as optim
+import datetime
+import json
 
 from experiment.loss import mean_squared_td_error, weight_error_norm
 from experiment.model import LinearTransformer
@@ -11,8 +13,9 @@ from experiment.prompt import Feature, MDP_Prompt, Prompt
 from experiment.utils import (compute_mspbe, compute_msve,
                               manual_weight_extraction, solve_mspbe_weight,
                               solve_msve_weight)
-# from torch_in_context_td import HC_Transformer
 from MRP.boyan import BoyanChain
+import os
+
 
 
 def tf_pred_v(tf: LinearTransformer,
@@ -69,7 +72,8 @@ def train(d: int,
           lr: float = 0.001,
           weight_decay=1e-6,
           steps: int = 50_000,
-          log_interval: int = 100):
+          log_interval: int = 100,
+          save_dir: str = None):
     '''
     d: feature dimension
     s: number of states
@@ -84,6 +88,13 @@ def train(d: int,
     log_interval: logging interval
     '''
 
+    if save_dir is None:
+        startTime = datetime.datetime.now()
+        save_dir = os.path.join('./logs', "discounted_train", startTime.strftime("%Y-%m-%d-%H-%M-%S"))
+    else:
+        save_dir = os.path.join('./logs', "discounted_train", save_dir)
+    
+    print(save_dir)
     tf = LinearTransformer(d, n, l, lmbd, mode='auto')
     opt = optim.Adam(tf.parameters(), lr=lr, weight_decay=weight_decay)
     features = Feature(d, s)
@@ -166,15 +177,83 @@ def train(d: int,
     print('MSVE Weight:\n', w_msve)
     print('MSPBE Weight:\n', w_mspbe)
 
-    with open('./logs/discounted_train.pkl', 'wb') as f:
+    # Create directory if it doesn't exist
+    if not os.path.exists(save_dir):
+        os.makedirs(save_dir)
+
+    with open(os.path.join(save_dir,'discounted_train.pkl'), 'wb') as f:
         pickle.dump(log, f)
 
+    hyperparameters = {
+        'd': d,
+        's': s,
+        'n': n,
+        'l': l,
+        'gamma': gamma,
+        'lmbd': lmbd,
+        'sample_weight': sample_weight,
+        'lr': lr,
+        'weight_decay': weight_decay,
+        'steps': steps,
+        'log_interval': log_interval
+    }
+
+    # Save log dictionary as JSON
+    with open(os.path.join(save_dir, 'params.json'), 'w') as f:
+        json.dump(hyperparameters, f)
+
+    plot_data(log, save_dir)
+
+def plot_data(log,save_dir):
+
+    # Loss Plot
+    plt.figure()
+    plt.plot(log['xs'], log['mstde'], label='MSTDE')
+    plt.xlabel('Steps')
+    plt.ylabel('Loss')
+    plt.title('Loss vs Steps')
+    plt.legend()
+    plt.savefig(os.path.join(save_dir,'loss_mstde.png'), dpi= 300)
+
+    # Weight norm plot
+    plt.figure()
+    plt.plot(log['xs'], log['msve weight error norm'], label='MSVE Weight Error Norm')
+    plt.plot(log['xs'], log['mspbe weight error norm'], label='MSPBE Weight Error Norm')
+    plt.xlabel('Steps')
+    plt.ylabel('Weight Error L2 Norm')
+    plt.title('Weight Error Norm vs Steps')
+    plt.legend()
+    plt.savefig(os.path.join(save_dir,'weight_error_norm.png'),dpi=300)
+
+    # Value Error Plot
+    plt.figure()
+    plt.plot(log['xs'], log['true msve'], label='True MSVE')
+    plt.plot(log['xs'], log['transformer msve'], label='Transformer MSVE')
+    plt.xlabel('Steps')
+    plt.ylabel('MSVE')
+    plt.title('MSVE vs Steps')
+    plt.legend()
+    plt.savefig(os.path.join(save_dir,'msve.png'),dpi=300)
+
+    # MSPBE Plot
+    plt.figure()
+    plt.plot(log['xs'], log['transformer mspbe'], label='Transformer MSPBE')
+    plt.xlabel('Steps')
+    plt.ylabel('MSPBE')
+    plt.title('MSPBE vs Steps')
+    plt.legend()
+    plt.savefig(os.path.join(save_dir,'mspbe.png'), dpi=300)
 
 if __name__ == '__main__':
     torch.manual_seed(2)
     np.random.seed(2)
-    d = 4
+    d = 5
     n = 200
-    l = 4
-    s = int(n/10)  # number of states equal to the context length
-    train(d, s, n, l, lmbd=0.0, sample_weight=False, steps=10_000)
+    #l = 4
+    #s = int(n/10)  # number of states equal to the context length
+    for l in [1,2,4,6]:
+        for s_frac in [2,4,6,10]:
+            for sw in [True, False]:
+                s = int(n/s_frac)
+                train(d, s, n, l, lmbd=0.0, sample_weight=sw, steps=25_000, 
+                      log_interval=250,save_dir='l{layer}_s{s_}_sw{samp_w}'.format(layer=l, s_=s, samp_w=sw))
