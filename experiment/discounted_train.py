@@ -96,7 +96,6 @@ def train(d: int,
     
     tf = LinearTransformer(d, n, l, lmbd, mode='auto')
     opt = optim.Adam(tf.parameters(), lr=lr, weight_decay=weight_decay)
-    features = Feature(d, s)
 
     log = {'xs': [],
            'mstde': [],
@@ -107,6 +106,8 @@ def train(d: int,
            'transformer mspbe': []
            }
     for i in range(steps):
+        # generate a new feature
+        features = Feature(d, s)
         # generate a new prompt
         if sample_weight:
             w_true = np.random.randn(d, 1).astype(np.float32)
@@ -280,5 +281,4 @@ if __name__ == '__main__':
     n = 200
     l = 3
     s = int(n/10) 
-    train(d, s, n, l, lmbd=0.0, sample_weight=False, steps=20_000, 
-        log_interval=50)
+    train(d, s, n, l, lmbd=0.0, sample_weight=False, steps=20_000, log_interval=50)
