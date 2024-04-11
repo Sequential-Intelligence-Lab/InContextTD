@@ -12,7 +12,7 @@ class Feature:
         '''
         self.d = d
         self.s = s
-        self.phi = np.random.randn(s, d)
+        self.phi = np.random.uniform(low=-1, high=1, size=(s, d))
 
     def get_feature(self, s: int):
         return self.phi[s]
