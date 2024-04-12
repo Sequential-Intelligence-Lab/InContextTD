@@ -9,36 +9,21 @@ import json
 
 from experiment.loss import mean_squared_td_error, weight_error_norm
 from experiment.model import LinearTransformer
-from experiment.prompt import Feature, MDP_Prompt, Prompt
+from experiment.prompt import Feature, MDP_Prompt_Generator, Prompt
 from experiment.utils import (compute_mspbe, compute_msve,
-                              manual_weight_extraction, solve_mspbe_weight,
+                              solve_mspbe_weight,
                               solve_msve_weight)
 from MRP.boyan import BoyanChain
 import os
 
 
 
-def tf_pred_v(tf: LinearTransformer,
-              context: torch.tensor,
-              X: np.ndarray) -> torch.tensor:
-    d = X.shape[1]
-    X = torch.from_numpy(X)
-    tf_v = []
-    for feature in X:
-        feature_col = torch.zeros((2*d+1, 1))
-        feature_col[:d, 0] = feature
-        Z_p = torch.cat([context, feature_col], dim=1)
-        Z_tf = tf(Z_p)
-        tf_v.append(-Z_tf[-1, -1])
-    tf_v = torch.stack(tf_v, dim=0).reshape(-1, 1)
-    return tf_v
-
 def compute_tf_msve(tf: LinearTransformer,
                     context: torch.tensor,
                     X: np.ndarray,
                     true_v: np.ndarray,
                     steady_d: np.ndarray) -> float:
-    tf_v = tf_pred_v(tf, context, X)
+    tf_v = tf.pred_v_array(context, X)
     tf_v = tf_v.detach().numpy()
     error = tf_v - true_v
     msve = steady_d.dot(error**2)
@@ -52,7 +37,7 @@ def compute_tf_mspbe(tf: LinearTransformer,
                      r: np.ndarray,
                      gamma: float,
                      steady_dist: np.ndarray) -> float:
-    tf_v = tf_pred_v(tf, context, X)
+    tf_v = tf.pred_v_array(context, X)
     tf_v = tf_v.detach().numpy()
     
     D = np.diag(steady_dist)
@@ -71,9 +56,11 @@ def train(d: int,
           sample_weight: bool = True,
           lr: float = 0.001,
           weight_decay=1e-6,
-          steps: int = 50_000,
+          epochs: int = 10_000,
           log_interval: int = 100,
-          save_dir: str = None):
+          save_dir: str = None,
+          mini_batch_size: int = None,
+          mdp_eval_samples: int = None):
     '''
     d: feature dimension
     s: number of states
@@ -86,6 +73,8 @@ def train(d: int,
     weight_decay: regularization
     steps: number of training steps
     log_interval: logging interval
+    save_dir: directory to save logs
+    mini_batch_size: mini batch size
     '''
 
     if save_dir is None:
@@ -93,7 +82,15 @@ def train(d: int,
         save_dir = os.path.join('./logs', "discounted_train", startTime.strftime("%Y-%m-%d-%H-%M-%S"))
     else:
         save_dir = os.path.join('./logs', "discounted_train", save_dir)
-    
+
+    if mdp_eval_samples is None:
+        mdp_eval_samples = n
+
+    if mini_batch_size is None:
+        mini_batch_size = n
+
+    hyperparameters = locals()
+        
     tf = LinearTransformer(d, n, l, lmbd, mode='auto')
     opt = optim.Adam(tf.parameters(), lr=lr, weight_decay=weight_decay)
 
@@ -105,30 +102,56 @@ def train(d: int,
            'transformer msve': [],
            'transformer mspbe': []
            }
-    for i in range(steps):
-        # generate a new feature
-        features = Feature(d, s)
-        # generate a new prompt
-        if sample_weight:
-            w_true = np.random.randn(d, 1).astype(np.float32)
-            boyan_mdp = BoyanChain(
-                n_states=s, gamma=gamma, weight=w_true, X=features.phi)
-        else:
-            boyan_mdp = BoyanChain(n_states=s, gamma=gamma)
+    
+    eval_samples_used = 1
+    # generate a new feature set and prompt generator
+    features = Feature(d, s)
+    # generate a new prompt
+    if sample_weight:
+        w_true = np.random.randn(d, 1).astype(np.float32)
+        boyan_mdp = BoyanChain(
+            n_states=s, gamma=gamma, weight=w_true, X=features.phi)
+    else:
+        boyan_mdp = BoyanChain(n_states=s, gamma=gamma)
+    pro = MDP_Prompt_Generator(boyan_mdp, features, n, mdp_eval_samples, gamma)
 
-        # Markovian prompt based prompt from Boyan Chain
-        pro = MDP_Prompt(boyan_mdp, features, n, gamma)
+    ### Training Loop ###
+    for i in range(epochs):
+        vf_predictions = []
+        vf_targets = []
+        for _ in range (mini_batch_size):
+            if eval_samples_used == mdp_eval_samples:
+                # generate a new feature set and prompt generator
+                features = Feature(d, s)
+                if sample_weight:
+                    w_true = np.random.randn(d, 1).astype(np.float32)
+                    boyan_mdp = BoyanChain(
+                        n_states=s, gamma=gamma, weight=w_true, X=features.phi)
+                else:
+                    boyan_mdp = BoyanChain(n_states=s, gamma=gamma)
+                pro = MDP_Prompt_Generator(boyan_mdp, features, n, mdp_eval_samples, gamma)
+                eval_samples_used = 1
 
-        Z_0 = pro.z()
+            Z_0 = pro.z()
+            tf_pred_vf= tf.pred_v(Z_0)
+            # generate a new prompt by sliding over the mdp samples
+            pro.next_prompt()
+            eval_samples_used += 1
+            with torch.no_grad(): # no gradient computation for the target value function
+                tf_target_vf = tf.pred_v(pro.z()) # now the query is the successor state
 
+            vf_predictions.append(tf_pred_vf)
+            vf_targets.append(tf_target_vf)
+            
+        import pdb; pdb.set_trace()
+        mstde = mean_squared_td_error(tf_pred_vf, tf_target_vf, gamma, Z_0, n)
         # extract the learned weights from the transformer
-        w_tf = manual_weight_extraction(tf, Z_0, d)
-        mstde = mean_squared_td_error(w_tf, Z_0, d, n)
         opt.zero_grad()
         mstde.backward()
         opt.step()
 
         if i % log_interval == 0:
+            w_tf = tf.manual_weight_extraction(Z_0, d)
             log['xs'].append(i)
             log['mstde'].append(mstde.item())
 
@@ -153,7 +176,7 @@ def train(d: int,
             print('MSVE Weight:\n', w_msve)
             print('MSPBE Weight:\n', w_mspbe)
 
-    log['xs'].append(steps)
+    log['xs'].append(epochs)
     log['mstde'].append(mstde.item())
 
     w_msve = solve_msve_weight(boyan_mdp.steady_d, features.phi, boyan_mdp.v)
@@ -172,7 +195,7 @@ def train(d: int,
     tf_mspbe = compute_tf_mspbe(tf, pro.context(), features.phi, boyan_mdp.P, boyan_mdp.r, gamma, boyan_mdp.steady_d)
     log['transformer mspbe'].append(tf_mspbe)
 
-    print('Step:', steps)
+    print('Step:', epochs)
     print('Transformer Learned Weight:\n', w_tf.detach().numpy())
     print('MSVE Weight:\n', w_msve)
     print('MSPBE Weight:\n', w_mspbe)
@@ -180,45 +203,17 @@ def train(d: int,
     # Create directory if it doesn't exist
     if not os.path.exists(save_dir):
         os.makedirs(save_dir)
-
+    
+    # Save log dictionary as JSON
     with open(os.path.join(save_dir,'discounted_train.pkl'), 'wb') as f:
         pickle.dump(log, f)
 
-    hyperparameters = {
-        'd': d,
-        's': s,
-        'n': n,
-        'l': l,
-        'gamma': gamma,
-        'lmbd': lmbd,
-        'sample_weight': sample_weight,
-        'lr': lr,
-        'weight_decay': weight_decay,
-        'steps': steps,
-        'log_interval': log_interval
-    }
-
-    # Save log dictionary as JSON
+    # Save hyperparameters as JSON
     with open(os.path.join(save_dir, 'params.json'), 'w') as f:
         json.dump(hyperparameters, f)
-    
-    # Save the final P and Q matrices
-    final_P = tf.attn.P.detach().numpy()
-    final_Q = tf.attn.Q.detach().numpy()
-
-    plt.figure()
-    plt.matshow(final_P)
-    plt.colorbar()
-    plt.title('Final P Matrix')
-    plt.savefig(os.path.join(save_dir, 'final_P.png'), dpi=300)
-
-    plt.figure()
-    plt.matshow(final_Q)
-    plt.colorbar()
-    plt.title('Final Q Matrix')
-    plt.savefig(os.path.join(save_dir, 'final_Q.png'), dpi=300)
 
     plot_data(log, save_dir)
+    evaluate_weights(tf, save_dir)
 
 def plot_data(log,save_dir):
 
@@ -260,6 +255,24 @@ def plot_data(log,save_dir):
     plt.legend()
     plt.savefig(os.path.join(save_dir,'mspbe.png'), dpi=300)
 
+
+def evaluate_weights(tf, save_dir):
+    # Save the final P and Q matrices
+    final_P = tf.attn.P.detach().numpy()
+    final_Q = tf.attn.Q.detach().numpy()
+
+    plt.figure()
+    plt.matshow(final_P)
+    plt.colorbar()
+    plt.title('Final P Matrix')
+    plt.savefig(os.path.join(save_dir, 'final_P.png'), dpi=300)
+
+    plt.figure()
+    plt.matshow(final_Q)
+    plt.colorbar()
+    plt.title('Final Q Matrix')
+    plt.savefig(os.path.join(save_dir, 'final_Q.png'), dpi=300)
+
 def run_hyperparam_search():
     torch.manual_seed(2)
     np.random.seed(2)
@@ -271,7 +284,7 @@ def run_hyperparam_search():
     for l in [1,2,4,6]:
         for sw in [True, False]:
             s = int(n/s_frac)
-            train(d, s, n, l, lmbd=0.0, sample_weight=sw, steps=25_000, 
+            train(d, s, n, l, lmbd=0.0, sample_weight=sw, epochs=25_000, 
                     log_interval=250,save_dir='l{layer}_s{s_}_sw{samp_w}'.format(layer=l, s_=s, samp_w=sw))
 
 if __name__ == '__main__':
@@ -281,4 +294,4 @@ if __name__ == '__main__':
     n = 200
     l = 3
     s = int(n/10) 
-    train(d, s, n, l, lmbd=0.0, sample_weight=False, steps=20_000, log_interval=50)
+    train(d, s, n, l, lmbd=0.0, sample_weight=False, epochs=20_000, mini_batch_size=5, log_interval=50)

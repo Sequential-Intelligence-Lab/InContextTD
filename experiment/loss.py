@@ -3,25 +3,20 @@ import numpy as np
 from model import LinearTransformer
 
 
-def mean_squared_td_error(w: torch.tensor,
+def mean_squared_td_error(v_vec: torch.tensor,
+                          v_prime_vec: torch.tensor,
+                          gamma: float,
                           Z: torch.tensor,
-                          d: int,
                           n: int):
     '''
-    w: weight vector (d, 1)
+    v_vec: value function prediction
+    v_prime_vec: target value function
     Z: prompt (2d+1, n)
-    d: feature dimension
     n: context length
     '''
-
-    Phi = Z[:d, :n]
-    Phi_prime = Z[d:2*d, :n]
     reward_vec = Z[-1, :n].reshape(1, n)
 
-    v_vec = w.t() @ Phi
-    # use detach() to prevent backpropagation through w here
-    v_prime_vec = w.t().detach() @ Phi_prime
-    tde_vec = reward_vec + v_prime_vec - v_vec
+    tde_vec = reward_vec + gamma*v_prime_vec - v_vec
     mstde = torch.mean(tde_vec**2, dim=1)
     return mstde
 
