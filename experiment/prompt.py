@@ -112,8 +112,7 @@ class MDP_Prompt_Generator:
             s = s_prime
 
         self.full_seq = np.stack(rows, axis=-1)
-        self.z_0 = torch.tensor(self.full_seq[:, self.slide_idx: self.slide_idx+self.n+1], dtype=torch.float32)
-        self.z_0[features.d:, -1] = 0
+        self.next_prompt()
 
     # return the prompt as a tensor
     def z(self)-> torch.Tensor:
@@ -127,25 +126,29 @@ class MDP_Prompt_Generator:
     def query_features(self)-> np.ndarray:
         return self.z_0[:self.features.d, -1:].detach().numpy().T
     
+    # returns the reward of the query as a tensor
+    def query_state_reward(self)-> torch.Tensor:
+        return self.query_reward
+    
     def next_prompt(self):
         try:
             assert self.slide_idx+self.n+1 < self.full_seq.shape[1]
         except AssertionError as e:
             e.args+= ("You cannot generate more than {eval_len} prompts using this MDP.".format(eval_len=self.eval_len),42)
             raise e
-        # slide the window by 1
-        self.slide_idx+=1
         # update Z_0
         self.z_0 = torch.tensor(self.full_seq[:, self.slide_idx: self.slide_idx+self.n+1], dtype=torch.float32)
+        self.query_reward = self.z_0[-1, -1].detach().clone() # get the reward of the query before we zero it out to generate the prompt
         self.z_0[self.features.d:, -1] = 0
-
-
+        
+        # slide the window by 1 for the next prompt
+        self.slide_idx+=1
 
 if __name__ == '__main__':
     d = 3
     s = 10
     n = 6
-    eval_len = 7
+    eval_len = 3
     gamma = 0.9
     feat = Feature(d, s)
     bc = BoyanChain(s, gamma)
@@ -157,8 +160,16 @@ if __name__ == '__main__':
     print(mdp_prompt.z())
     print("Context")
     print(mdp_prompt.context())
-    mdp_prompt.next_prompt()
-    print("Z_0 after sliding")
-    print(mdp_prompt.z())
+    print("Full Sequence")
+    print(mdp_prompt.full_seq)
+    for i in range(eval_len-1): # -1 is correct here since we already generate the first prompt upon initialization
+        print( f"Prompt {i+1}")
+        mdp_prompt.next_prompt()
+        print("Z_0 after sliding")
+        print(mdp_prompt.z())
+        print("Query Features")
+        print(mdp_prompt.query_features())
+        print("Query Reward")
+        print(mdp_prompt.query_state_reward())
 
     assert mdp_prompt.z_0.shape == (2*d+1, n+1)

@@ -88,8 +88,6 @@ def train(d: int,
 
     if mini_batch_size is None:
         mini_batch_size = n
-
-    hyperparameters = locals()
         
     tf = LinearTransformer(d, n, l, lmbd, mode='auto')
     opt = optim.Adam(tf.parameters(), lr=lr, weight_decay=weight_decay)
@@ -119,7 +117,8 @@ def train(d: int,
     for i in range(epochs):
         vf_predictions = []
         vf_targets = []
-        for _ in range (mini_batch_size):
+        rewards = []
+        for _ in range(mini_batch_size):
             if eval_samples_used == mdp_eval_samples:
                 # generate a new feature set and prompt generator
                 features = Feature(d, s)
@@ -131,21 +130,22 @@ def train(d: int,
                     boyan_mdp = BoyanChain(n_states=s, gamma=gamma)
                 pro = MDP_Prompt_Generator(boyan_mdp, features, n, mdp_eval_samples, gamma)
                 eval_samples_used = 1
-
             Z_0 = pro.z()
             tf_pred_vf= tf.pred_v(Z_0)
-            # generate a new prompt by sliding over the mdp samples
-            pro.next_prompt()
+            reward = pro.query_state_reward() # get the observed reward for the query state
+            pro.next_prompt()   # generate a new prompt by sliding over the mdp samples
             eval_samples_used += 1
             with torch.no_grad(): # no gradient computation for the target value function
                 tf_target_vf = tf.pred_v(pro.z()) # now the query is the successor state
 
             vf_predictions.append(tf_pred_vf)
             vf_targets.append(tf_target_vf)
+            rewards.append(reward)
             
-        vf_pred_tensor = torch.tensor(vf_predictions).view(-1,len(vf_predictions))
-        vf_targets_tensor = torch.tensor(vf_targets).view(-1,len(vf_targets))
-        mstde = mean_squared_td_error(vf_pred_tensor, vf_targets_tensor, gamma, Z_0, n)
+        vf_pred_tensor = torch.stack(vf_predictions)
+        vf_targets_tensor = torch.stack(vf_targets)
+        rewards_tensor = torch.tensor(rewards)
+        mstde = mean_squared_td_error(rewards_tensor, vf_pred_tensor, vf_targets_tensor, gamma)
         # extract the learned weights from the transformer
         opt.zero_grad()
         mstde.backward()
@@ -208,6 +208,20 @@ def train(d: int,
     # Save log dictionary as JSON
     with open(os.path.join(save_dir,'discounted_train.pkl'), 'wb') as f:
         pickle.dump(log, f)
+
+    hyperparameters = {
+        'd': d,
+        's': s,
+        'n': n,
+        'l': l,
+        'gamma': gamma,
+        'lmbd': lmbd,
+        'sample_weight': sample_weight,
+        'lr': lr,
+        'weight_decay': weight_decay,
+        'steps': epochs,
+        'log_interval': log_interval
+    }
 
     # Save hyperparameters as JSON
     with open(os.path.join(save_dir, 'params.json'), 'w') as f:
@@ -295,4 +309,4 @@ if __name__ == '__main__':
     n = 200
     l = 3
     s = int(n/10) 
-    train(d, s, n, l, lmbd=0.0, sample_weight=False, epochs=20_000, mini_batch_size=5, log_interval=50)
+    train(d, s, n, l, lmbd=0.0, sample_weight=False, epochs=20_000, mdp_eval_samples= n,mini_batch_size=n, log_interval=200)
