@@ -143,8 +143,9 @@ def train(d: int,
             vf_predictions.append(tf_pred_vf)
             vf_targets.append(tf_target_vf)
             
-        import pdb; pdb.set_trace()
-        mstde = mean_squared_td_error(tf_pred_vf, tf_target_vf, gamma, Z_0, n)
+        vf_pred_tensor = torch.tensor(vf_predictions).view(-1,len(vf_predictions))
+        vf_targets_tensor = torch.tensor(vf_targets).view(-1,len(vf_targets))
+        mstde = mean_squared_td_error(vf_pred_tensor, vf_targets_tensor, gamma, Z_0, n)
         # extract the learned weights from the transformer
         opt.zero_grad()
         mstde.backward()

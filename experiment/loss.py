@@ -15,7 +15,6 @@ def mean_squared_td_error(v_vec: torch.tensor,
     n: context length
     '''
     reward_vec = Z[-1, :n].reshape(1, n)
-
     tde_vec = reward_vec + gamma*v_prime_vec - v_vec
     mstde = torch.mean(tde_vec**2, dim=1)
     return mstde
