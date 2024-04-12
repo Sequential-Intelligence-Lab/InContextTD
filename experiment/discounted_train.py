@@ -71,7 +71,7 @@ def train(d: int,
     sample_weight: sample a random true weight vector
     lr: learning rate
     weight_decay: regularization
-    steps: number of training steps
+    Epochs: number of training Epochs
     log_interval: logging interval
     save_dir: directory to save logs
     mini_batch_size: mini batch size
@@ -219,7 +219,7 @@ def train(d: int,
         'sample_weight': sample_weight,
         'lr': lr,
         'weight_decay': weight_decay,
-        'steps': epochs,
+        'Epochs': epochs,
         'log_interval': log_interval
     }
 
@@ -235,9 +235,9 @@ def plot_data(log,save_dir):
     # Loss Plot
     plt.figure()
     plt.plot(log['xs'], log['mstde'], label='MSTDE')
-    plt.xlabel('Steps')
+    plt.xlabel('Epochs')
     plt.ylabel('Loss')
-    plt.title('Loss vs Steps')
+    plt.title('Loss vs Epochs')
     plt.legend()
     plt.savefig(os.path.join(save_dir,'loss_mstde.png'), dpi= 300)
 
@@ -245,9 +245,9 @@ def plot_data(log,save_dir):
     plt.figure()
     plt.plot(log['xs'], log['msve weight error norm'], label='MSVE Weight Error Norm')
     plt.plot(log['xs'], log['mspbe weight error norm'], label='MSPBE Weight Error Norm')
-    plt.xlabel('Steps')
+    plt.xlabel('Epochs')
     plt.ylabel('Weight Error L2 Norm')
-    plt.title('Weight Error Norm vs Steps')
+    plt.title('Weight Error Norm vs Epochs')
     plt.legend()
     plt.savefig(os.path.join(save_dir,'weight_error_norm.png'),dpi=300)
 
@@ -255,18 +255,18 @@ def plot_data(log,save_dir):
     plt.figure()
     plt.plot(log['xs'], log['true msve'], label='True MSVE')
     plt.plot(log['xs'], log['transformer msve'], label='Transformer MSVE')
-    plt.xlabel('Steps')
+    plt.xlabel('Epochs')
     plt.ylabel('MSVE')
-    plt.title('MSVE vs Steps')
+    plt.title('MSVE vs Epochs')
     plt.legend()
     plt.savefig(os.path.join(save_dir,'msve.png'),dpi=300)
 
     # MSPBE Plot
     plt.figure()
     plt.plot(log['xs'], log['transformer mspbe'], label='Transformer MSPBE')
-    plt.xlabel('Steps')
+    plt.xlabel('Epochs')
     plt.ylabel('MSPBE')
-    plt.title('MSPBE vs Steps')
+    plt.title('MSPBE vs Epochs')
     plt.legend()
     plt.savefig(os.path.join(save_dir,'mspbe.png'), dpi=300)
 
