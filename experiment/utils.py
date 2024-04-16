@@ -33,27 +33,6 @@ def analytical_weight_update(w_tf: torch.Tensor,
     return w_tf + 1/n * prod
 
 
-def manual_weight_extraction(tf: model.LinearTransformer,
-                             Z: torch.Tensor,
-                             d: int):
-    '''
-    tf: transformer model
-    Z: prompt
-    d: feature dimension
-    '''
-
-    context = Z[:, :-1]
-    weight = []
-    for i in range(d):
-        query = torch.zeros((2*d+1, 1))
-        query[i, 0] = -1
-        Z_p = torch.concat([context, query], dim=1)
-        Z_tf = tf(Z_p)
-        weight.append(Z_tf[-1, -1])
-    weight = torch.stack(weight, dim=0)
-    return weight.reshape((d, 1))
-
-
 def compute_steady_dist(P: np.array) -> np.ndarray:
     '''
     P: transition probability matrix
