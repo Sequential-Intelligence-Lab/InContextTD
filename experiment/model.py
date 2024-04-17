@@ -144,3 +144,5 @@ if __name__ == '__main__':
     ltf = LinearTransformer(d, n, l, lmbd, mode='auto')
     v_func = ltf.fit_value_func(mdp_prompt.context(), mdp_prompt.get_feature_mat(), manual=False)
     print(v_func.shape)
+    v_tf = ltf.pred_v(Z_0)
+    print(v_tf)
