@@ -13,7 +13,7 @@ class Feature:
         '''
         self.d = d
         self.s = s
-        self.phi = np.random.uniform(low=-1, high=1, size=(s, d))
+        self.phi = np.random.uniform(low=-1, high=1, size=(s, d)).astype(np.float32)
 
     def __call__(self, s: int):
         return self.phi[s]
@@ -134,7 +134,10 @@ class MDPPrompt:
 
     def query(self):
         return self._query
-
+    
+    def get_feature_mat(self):
+        return torch.from_numpy(self.feature_fun.phi)
+    
     def z(self):
         query_col = torch.concat(
             [self._query, torch.zeros((self.d+1, 1))], dim=0)
@@ -202,7 +205,7 @@ if __name__ == '__main__':
     eval_len = 3
     gamma = 0.9
 
-    
+
     prompt_gen = MDPPromptGenerator(s, d, n, gamma)
     prompt_gen.reset_feat()
     prompt_gen.reset_mdp(sample_weight=False)
