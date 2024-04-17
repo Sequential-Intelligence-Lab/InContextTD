@@ -107,11 +107,8 @@ class MDPPrompt:
             self.s = s_prime
 
         self._store_data()
-        
-        return self.z()
-    
-   
 
+        return self.z()
 
     def step(self):
         # step the MDP
@@ -122,7 +119,7 @@ class MDPPrompt:
 
         self._store_data()
         return self.z(), r
-    
+
     def _store_data(self):
         features = np.array(self.feature_window, dtype=np.float32)
         rewards = np.array(self.reward_window, dtype=np.float32)
@@ -134,12 +131,13 @@ class MDPPrompt:
 
     def context(self):
         return self._context
-    
+
     def query(self):
         return self._query
 
     def z(self):
-        query_col = torch.concat([self._query, torch.zeros((self.d+1, 1))], dim=0)
+        query_col = torch.concat(
+            [self._query, torch.zeros((self.d+1, 1))], dim=0)
         return torch.concat([self._context, query_col], dim=1)
 
     def td_update(self,
@@ -161,80 +159,40 @@ class MDPPrompt:
         v = new_w.t() @ self.phi[:, [-1]]
         return new_w, v.item()
 
-class MDP_Prompt_Generator:
+
+class MDPPromptGenerator:
     def __init__(self,
-                 mdp: BoyanChain,
-                 features: Feature,
+                 s: int,
+                 d: int,
                  n: int,
-                 eval_len: int,
                  gamma: float):
         '''
-        mdp: an instance of a BoyanChain MDP
-        features: the features
+        s: number of states
+        d: feature dimension
         n: context length
-        eval_len: # of training samples we want this MDP to generate
         gamma: discount factor
         '''
-        self.mdp = mdp
-        self.features = features
+
+        self.s = s
+        self.d = d
         self.n = n
-        self.eval_len = eval_len
         self.gamma = gamma
-        self.slide_idx = 0
 
-        try:
-            assert eval_len > 0  # eval_len must be greater than 0
-        except AssertionError as e:
-            e.args += ("We must use this MDP to generate at least 1 training sample", 42)
-            raise e
+    def reset_mdp(self, sample_weight: bool = False):
+        if sample_weight:
+            w = torch.rand(self.d, 1)
+            self.mdp = BoyanChain(n_states=self.s, gamma=self.gamma,
+                                  weight=w, X=self.feat.phi)
+        else:
+            self.mdp = BoyanChain(n_states=self.s, gamma=self.gamma)
 
-        rows = []
-        # sample from initial state distribution
-        s = mdp.reset()
+    def reset_feat(self):
+        self.feat = Feature(self.d, self.s)
 
-        # unroll the MDP n + eval_len + 1 step
-        for _ in range(self.n + self.eval_len+1):
-            s_prime, r = mdp.step(s)
-            row = np.concatenate([self.features.get_feature(
-                s), self.gamma*self.features.get_feature(s_prime), [r]])
-            rows.append(row)
-            s = s_prime
-
-        self.full_seq = np.stack(rows, axis=-1)
-        self.next_prompt()
-
-    # return the prompt as a tensor
-    def z(self) -> torch.Tensor:
-        return self.z_0
-
-    # return the context as a tensor
-    def context(self) -> torch.Tensor:
-        return self.z_0[:, :-1]
-
-    # returns the features of the query as a numpy array
-    def query_features(self) -> np.ndarray:
-        return self.z_0[:self.features.d, -1:].detach().numpy().T
-
-    # returns the reward of the query as a tensor
-    def query_state_reward(self) -> torch.Tensor:
-        return self.query_reward
-
-    def next_prompt(self):
-        try:
-            assert self.slide_idx+self.n+1 < self.full_seq.shape[1]
-        except AssertionError as e:
-            e.args += ("You cannot generate more than {eval_len} prompts using this MDP.".format(
-                eval_len=self.eval_len), 42)
-            raise e
-        # update Z_0
-        self.z_0 = torch.tensor(
-            self.full_seq[:, self.slide_idx: self.slide_idx+self.n+1], dtype=torch.float32)
-        # get the reward of the query before we zero it out to generate the prompt
-        self.query_reward = self.z_0[-1, -1].detach().clone()
-        self.z_0[self.features.d:, -1] = 0
-
-        # slide the window by 1 for the next prompt
-        self.slide_idx += 1
+    def get_prompt(self):
+        assert self.mdp is not None, "call reset_mdp first"
+        assert self.feat is not None, "call reset_feat first"
+        return MDPPrompt(self.d, self.n, self.gamma, self.mdp, self.feat)
 
 
 if __name__ == '__main__':
@@ -243,15 +201,25 @@ if __name__ == '__main__':
     n = 6
     eval_len = 3
     gamma = 0.9
-    feat = Feature(d, s)
-    bc = BoyanChain(s, gamma)
-    mdp_prompt = MDPPrompt(d, n, gamma, bc, feat)
+
+    
+    prompt_gen = MDPPromptGenerator(s, d, n, gamma)
+    prompt_gen.reset_feat()
+    prompt_gen.reset_mdp(sample_weight=False)
+    mdp_prompt = prompt_gen.get_prompt()
     Z_0 = mdp_prompt.reset()
     print(Z_0)
-    Z_1, r =  mdp_prompt.step()
+    Z_1 = mdp_prompt.step()
     print(Z_1)
-    print(r)
-    
+
+    prompt_gen.reset_feat()
+    prompt_gen.reset_mdp(sample_weight=False)
+    mdp_prompt = prompt_gen.get_prompt()
+    Z_0 = mdp_prompt.reset()
+    print(Z_0)
+    Z_1 = mdp_prompt.step()
+    print(Z_1)
+
     # mdp_prompt = MDP_Prompt_Generator(bc, feat, n, eval_len, gamma)
 
     # print("Features")
