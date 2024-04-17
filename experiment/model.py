@@ -87,9 +87,9 @@ class LinearTransformer(nn.Module):
 
 
     def fit_value_func(self,
-                       context: torch.tensor,
-                       X: torch.tensor,
-                       manual: bool = False) -> torch.tensor:
+                       context: torch.Tensor,
+                       X: torch.Tensor,
+                       manual: bool = False) -> torch.Tensor:
         '''
         context: the context of shape (2*d+1, n)
         X: features of shape (s, d)
@@ -102,15 +102,15 @@ class LinearTransformer(nn.Module):
         else:
             tf_v = []
             for feature in X:
-                feature_col = torch.zeros((2*d+1, 1))
-                feature_col[:d, 0] = feature
+                feature_col = torch.zeros((2*self.d+1, 1))
+                feature_col[:self.d, 0] = feature
                 Z_p = torch.cat([context, feature_col], dim=1)
                 v_tf = self.pred_v(Z_p)
                 tf_v.append(v_tf)
             tf_v = torch.stack(tf_v, dim=0).unsqueeze(1)
             return tf_v
 
-    def pred_v(self, Z: torch.Tensor, manual: bool = False):
+    def pred_v(self, Z: torch.Tensor, manual: bool = False) -> torch.Tensor:
         '''
         Z: prompt of shape (2*d+1, n+1)
         manual: whether to use manual weight extraction or not
