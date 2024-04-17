@@ -1,51 +1,42 @@
+import datetime
+import json
+import os
 import pickle
 
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
 import torch.optim as optim
-import datetime
-import json
 
-from experiment.loss import mean_squared_td_error, weight_error_norm
+from experiment.loss import weight_error_norm
 from experiment.model import LinearTransformer
-from experiment.prompt import Feature, MDP_Prompt_Generator, Prompt
-from experiment.utils import (compute_mspbe, compute_msve,
-                              solve_mspbe_weight,
+from experiment.prompt import MDPPromptGenerator
+from experiment.utils import (compute_msve, solve_mspbe_weight,
                               solve_msve_weight)
-from MRP.boyan import BoyanChain
-import os
 
 
-
-def compute_tf_msve(tf: LinearTransformer,
-                    context: torch.tensor,
-                    X: np.ndarray,
-                    true_v: np.ndarray,
+def compute_tf_msve(v_tf: np.ndarray,
+                    v_true: np.ndarray,
                     steady_d: np.ndarray) -> float:
-    tf_v = tf.pred_v_array(context, X)
-    tf_v = tf_v.detach().numpy()
-    error = tf_v - true_v
+    error = v_tf - v_true
     msve = steady_d.dot(error**2)
     return msve.item()
 
 
-def compute_tf_mspbe(tf: LinearTransformer,
-                     context: torch.tensor,
+def compute_tf_mspbe(v_tf: np.ndarray,
                      X: np.ndarray,
                      P: np.ndarray,
                      r: np.ndarray,
                      gamma: float,
                      steady_dist: np.ndarray) -> float:
-    tf_v = tf.pred_v_array(context, X)
-    tf_v = tf_v.detach().numpy()
-    
+
     D = np.diag(steady_dist)
     projection = X @ np.linalg.inv(X.T @ D @ X) @ X.T @ D
 
-    pbe = projection @ (r + gamma * P @ tf_v - tf_v)
+    pbe = projection @ (r + gamma * P @ v_tf - v_tf)
     mspbe = steady_dist.dot(pbe**2)
     return mspbe.item()
+
 
 def train(d: int,
           s: int,
@@ -53,14 +44,15 @@ def train(d: int,
           l: int,
           gamma: float = 0.9,
           lmbd: float = 0.0,
-          sample_weight: bool = True,
+          sample_weight: bool = False,
+          manual: bool = False,
           lr: float = 0.001,
           weight_decay=1e-6,
-          epochs: int = 10_000,
-          log_interval: int = 100,
-          save_dir: str = None,
-          mini_batch_size: int = None,
-          mdp_eval_samples: int = None):
+          n_mdps: int = 10_000,
+          mini_batch_size: int = 64,
+          n_batch_per_mdp: int = 5,
+          log_interval: int = 20,
+          save_dir: str = None):
     '''
     d: feature dimension
     s: number of states
@@ -79,16 +71,11 @@ def train(d: int,
 
     if save_dir is None:
         startTime = datetime.datetime.now()
-        save_dir = os.path.join('./logs', "discounted_train", startTime.strftime("%Y-%m-%d-%H-%M-%S"))
+        save_dir = os.path.join(
+            './logs', "discounted_train", startTime.strftime("%Y-%m-%d-%H-%M-%S"))
     else:
         save_dir = os.path.join('./logs', "discounted_train", save_dir)
 
-    if mdp_eval_samples is None:
-        mdp_eval_samples = n
-
-    if mini_batch_size is None:
-        mini_batch_size = n
-        
     tf = LinearTransformer(d, n, l, lmbd, mode='auto')
     opt = optim.Adam(tf.parameters(), lr=lr, weight_decay=weight_decay)
 
@@ -100,113 +87,100 @@ def train(d: int,
            'transformer msve': [],
            'transformer mspbe': []
            }
-    
-    eval_samples_used = 1
-    # generate a new feature set and prompt generator
-    features = Feature(d, s)
-    # generate a new prompt
-    if sample_weight:
-        w_true = np.random.randn(d, 1).astype(np.float32)
-        boyan_mdp = BoyanChain(
-            n_states=s, gamma=gamma, weight=w_true, X=features.phi)
-    else:
-        boyan_mdp = BoyanChain(n_states=s, gamma=gamma)
-    pro = MDP_Prompt_Generator(boyan_mdp, features, n, mdp_eval_samples, gamma)
 
+    pro_gen = MDPPromptGenerator(s, d, n, gamma)
     ### Training Loop ###
-    for i in range(epochs):
-        vf_predictions = []
-        vf_targets = []
-        rewards = []
-        for _ in range(mini_batch_size):
-            if eval_samples_used == mdp_eval_samples:
-                # generate a new feature set and prompt generator
-                features = Feature(d, s)
-                if sample_weight:
-                    w_true = np.random.randn(d, 1).astype(np.float32)
-                    boyan_mdp = BoyanChain(
-                        n_states=s, gamma=gamma, weight=w_true, X=features.phi)
-                else:
-                    boyan_mdp = BoyanChain(n_states=s, gamma=gamma)
-                pro = MDP_Prompt_Generator(boyan_mdp, features, n, mdp_eval_samples, gamma)
-                eval_samples_used = 1
-            Z_0 = pro.z()
-            tf_pred_vf= tf.pred_v(Z_0)
-            reward = pro.query_state_reward() # get the observed reward for the query state
-            pro.next_prompt()   # generate a new prompt by sliding over the mdp samples
-            eval_samples_used += 1
-            with torch.no_grad(): # no gradient computation for the target value function
-                tf_target_vf = tf.pred_v(pro.z()) # now the query is the successor state
-
-            vf_predictions.append(tf_pred_vf)
-            vf_targets.append(tf_target_vf)
-            rewards.append(reward)
-            
-        vf_pred_tensor = torch.stack(vf_predictions)
-        vf_targets_tensor = torch.stack(vf_targets)
-        rewards_tensor = torch.tensor(rewards)
-        mstde = mean_squared_td_error(rewards_tensor, vf_pred_tensor, vf_targets_tensor, gamma)
-        # extract the learned weights from the transformer
-        opt.zero_grad()
-        mstde.backward()
-        opt.step()
+    for i in range(n_mdps):
+        pro_gen.reset_feat()  # reset feature
+        pro_gen.reset_mdp(sample_weight=sample_weight)  # reset MDP
+        prompt = pro_gen.get_prompt()  # get prompt object
+        for _ in range(n_batch_per_mdp):
+            mstde = 0.0
+            Z_0 = prompt.reset()
+            v_current = tf.pred_v(Z_0, manual=manual)
+            for _ in range(mini_batch_size):
+                Z_next, reward = prompt.step()  # slide window
+                v_next = tf.pred_v(Z_next, manual=manual)
+                tde = reward + gamma*v_next.detach() - v_current
+                mstde += tde**2
+                v_current = v_next
+            mstde /= mini_batch_size
+            opt.zero_grad()
+            mstde.backward()
+            opt.step()
 
         if i % log_interval == 0:
-            w_tf = tf.manual_weight_extraction(Z_0, d)
+            prompt.reset()  # reset prompt for fair testing
+            mdp = prompt.mdp
+            phi = prompt.feature_fun.phi
+            w_tf = tf.manual_weight_extraction(
+                prompt.context(), d).detach().numpy()
+            v_tf = tf.fit_value_func(
+                prompt.context(), torch.from_numpy(phi)).detach().numpy()
+
             log['xs'].append(i)
             log['mstde'].append(mstde.item())
 
-            w_msve = solve_msve_weight(boyan_mdp.steady_d, features.phi, boyan_mdp.v)
-            w_msve_tensor = torch.from_numpy(w_msve)
-            log['msve weight error norm'].append(weight_error_norm(w_tf.detach(), w_msve_tensor).item())
+            w_msve = solve_msve_weight(mdp.steady_d, phi, mdp.v)
+            log['msve weight error norm'].append(
+                weight_error_norm(w_tf, w_msve).item())
 
-            w_mspbe = solve_mspbe_weight(boyan_mdp.steady_d, boyan_mdp.P, features.phi, boyan_mdp.r, gamma)
-            w_mspbe_tensor = torch.from_numpy(w_mspbe)
-            log['mspbe weight error norm'].append(weight_error_norm(w_tf.detach(), w_mspbe_tensor).item())
+            w_mspbe = solve_mspbe_weight(
+                mdp.steady_d, mdp.P, phi, mdp.r, gamma)
+            log['mspbe weight error norm'].append(
+                weight_error_norm(w_tf, w_mspbe).item())
 
-            true_msve = compute_msve(w_msve, boyan_mdp.steady_d, features.phi, boyan_mdp.v)
+            true_msve = compute_msve(w_msve, mdp.steady_d, phi, mdp.v)
             log['true msve'].append(true_msve)
-            tf_msve = compute_tf_msve(tf, pro.context(), features.phi, boyan_mdp.v, boyan_mdp.steady_d)
+            tf_msve = compute_tf_msve(v_tf, mdp.v, mdp.steady_d)
             log['transformer msve'].append(tf_msve)
 
-            tf_mspbe = compute_tf_mspbe(tf, pro.context(), features.phi, boyan_mdp.P, boyan_mdp.r, gamma, boyan_mdp.steady_d)
+            tf_mspbe = compute_tf_mspbe(
+                v_tf, phi, mdp.P, mdp.r, gamma, mdp.steady_d)
             log['transformer mspbe'].append(tf_mspbe)
 
             print('Step:', i)
-            print('Transformer Learned Weight:\n', w_tf.detach().numpy())
+            print('Transformer Learned Weight:\n', w_tf)
             print('MSVE Weight:\n', w_msve)
             print('MSPBE Weight:\n', w_mspbe)
 
-    log['xs'].append(epochs)
+    prompt.reset()  # reset prompt for fair testing
+    mdp = prompt.mdp
+    phi = prompt.feature_fun.phi
+    w_tf = tf.manual_weight_extraction(prompt.context(), d).detach().numpy()
+    v_tf = tf.fit_value_func(
+        prompt.context(), torch.from_numpy(phi)).detach().numpy()
+
+    log['xs'].append(n_mdps)
     log['mstde'].append(mstde.item())
 
-    w_msve = solve_msve_weight(boyan_mdp.steady_d, features.phi, boyan_mdp.v)
-    w_msve_tensor = torch.from_numpy(w_msve)
-    log['msve weight error norm'].append(weight_error_norm(w_tf.detach(), w_msve_tensor).item())
+    w_msve = solve_msve_weight(mdp.steady_d, phi, mdp.v)
+    log['msve weight error norm'].append(
+        weight_error_norm(w_tf, w_msve).item())
 
-    w_mspbe = solve_mspbe_weight(boyan_mdp.steady_d, boyan_mdp.P, features.phi, boyan_mdp.r, gamma)
-    w_mspbe_tensor = torch.from_numpy(w_mspbe)
-    log['mspbe weight error norm'].append(weight_error_norm(w_tf.detach(), w_mspbe_tensor).item())
+    w_mspbe = solve_mspbe_weight(mdp.steady_d, mdp.P, phi, mdp.r, gamma)
+    log['mspbe weight error norm'].append(
+        weight_error_norm(w_tf, w_mspbe).item())
 
-    true_msve = compute_msve(w_msve, boyan_mdp.steady_d, features.phi, boyan_mdp.v)
+    true_msve = compute_msve(w_msve, mdp.steady_d, phi, mdp.v)
     log['true msve'].append(true_msve)
-    tf_msve = compute_tf_msve(tf, pro.context(), features.phi, boyan_mdp.v, boyan_mdp.steady_d)
+    tf_msve = compute_tf_msve(v_tf, mdp.v, mdp.steady_d)
     log['transformer msve'].append(tf_msve)
 
-    tf_mspbe = compute_tf_mspbe(tf, pro.context(), features.phi, boyan_mdp.P, boyan_mdp.r, gamma, boyan_mdp.steady_d)
+    tf_mspbe = compute_tf_mspbe(v_tf, phi, mdp.P, mdp.r, gamma, mdp.steady_d)
     log['transformer mspbe'].append(tf_mspbe)
 
-    print('Step:', epochs)
-    print('Transformer Learned Weight:\n', w_tf.detach().numpy())
+    print('Step:', n_mdps)
+    print('Transformer Learned Weight:\n', w_tf)
     print('MSVE Weight:\n', w_msve)
     print('MSPBE Weight:\n', w_mspbe)
 
     # Create directory if it doesn't exist
     if not os.path.exists(save_dir):
         os.makedirs(save_dir)
-    
+
     # Save log dictionary as JSON
-    with open(os.path.join(save_dir,'discounted_train.pkl'), 'wb') as f:
+    with open(os.path.join(save_dir, 'discounted_train.pkl'), 'wb') as f:
         pickle.dump(log, f)
 
     hyperparameters = {
@@ -217,9 +191,12 @@ def train(d: int,
         'gamma': gamma,
         'lmbd': lmbd,
         'sample_weight': sample_weight,
+        'manual': manual,
+        'n_mdps': n_mdps,
+        'mini_batch_size': mini_batch_size,
+        'n_batch_per_mdp': n_batch_per_mdp,
         'lr': lr,
         'weight_decay': weight_decay,
-        'Epochs': epochs,
         'log_interval': log_interval
     }
 
@@ -230,7 +207,8 @@ def train(d: int,
     plot_data(log, save_dir)
     evaluate_weights(tf, save_dir)
 
-def plot_data(log,save_dir):
+
+def plot_data(log, save_dir):
 
     # Loss Plot
     plt.figure()
@@ -239,17 +217,19 @@ def plot_data(log,save_dir):
     plt.ylabel('Loss')
     plt.title('Loss vs Epochs')
     plt.legend()
-    plt.savefig(os.path.join(save_dir,'loss_mstde.png'), dpi= 300)
+    plt.savefig(os.path.join(save_dir, 'loss_mstde.png'), dpi=300)
 
     # Weight norm plot
     plt.figure()
-    plt.plot(log['xs'], log['msve weight error norm'], label='MSVE Weight Error Norm')
-    plt.plot(log['xs'], log['mspbe weight error norm'], label='MSPBE Weight Error Norm')
+    plt.plot(log['xs'], log['msve weight error norm'],
+             label='MSVE Weight Error Norm')
+    plt.plot(log['xs'], log['mspbe weight error norm'],
+             label='MSPBE Weight Error Norm')
     plt.xlabel('Epochs')
     plt.ylabel('Weight Error L2 Norm')
     plt.title('Weight Error Norm vs Epochs')
     plt.legend()
-    plt.savefig(os.path.join(save_dir,'weight_error_norm.png'),dpi=300)
+    plt.savefig(os.path.join(save_dir, 'weight_error_norm.png'), dpi=300)
 
     # Value Error Plot
     plt.figure()
@@ -259,7 +239,7 @@ def plot_data(log,save_dir):
     plt.ylabel('MSVE')
     plt.title('MSVE vs Epochs')
     plt.legend()
-    plt.savefig(os.path.join(save_dir,'msve.png'),dpi=300)
+    plt.savefig(os.path.join(save_dir, 'msve.png'), dpi=300)
 
     # MSPBE Plot
     plt.figure()
@@ -268,7 +248,7 @@ def plot_data(log,save_dir):
     plt.ylabel('MSPBE')
     plt.title('MSPBE vs Epochs')
     plt.legend()
-    plt.savefig(os.path.join(save_dir,'mspbe.png'), dpi=300)
+    plt.savefig(os.path.join(save_dir, 'mspbe.png'), dpi=300)
 
 
 def evaluate_weights(tf, save_dir):
@@ -288,25 +268,27 @@ def evaluate_weights(tf, save_dir):
     plt.title('Final Q Matrix')
     plt.savefig(os.path.join(save_dir, 'final_Q.png'), dpi=300)
 
+
 def run_hyperparam_search():
     torch.manual_seed(2)
     np.random.seed(2)
     d = 5
     n = 200
-    #l = 4
-    #s = int(n/10)  # number of states equal to the context length
+    # l = 4
+    # s = int(n/10)  # number of states equal to the context length
     s_frac = 10
-    for l in [1,2,4,6]:
+    for l in [1, 2, 4, 6]:
         for sw in [True, False]:
             s = int(n/s_frac)
-            train(d, s, n, l, lmbd=0.0, sample_weight=sw, epochs=25_000, 
-                    log_interval=250,save_dir='l{layer}_s{s_}_sw{samp_w}'.format(layer=l, s_=s, samp_w=sw))
+            train(d, s, n, l, lmbd=0.0, sample_weight=sw, epochs=25_000,
+                  log_interval=250, save_dir='l{layer}_s{s_}_sw{samp_w}'.format(layer=l, s_=s, samp_w=sw))
+
 
 if __name__ == '__main__':
     torch.manual_seed(2)
     np.random.seed(2)
-    d = 5
-    n = 200
+    d = 4
+    n = 100
     l = 3
-    s = int(n/10) 
-    train(d, s, n, l, lmbd=0.0, sample_weight=False, epochs=20_000, mdp_eval_samples= n,mini_batch_size=n, log_interval=200)
+    s = int(n/10)
+    train(d, s, n, l, n_mdps=2000)
