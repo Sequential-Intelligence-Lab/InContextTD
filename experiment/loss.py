@@ -41,13 +41,13 @@ def self_consistency_loss(tf: LinearTransformer,
     return steady_dist @ squared_error
 
 
-def weight_error_norm(w1: torch.tensor,
-                      w2: torch.tensor):
+def weight_error_norm(w1: np.ndarray,
+                      w2: np.ndarray):
     '''
     w1: weight vector (d, 1)
     w2: weight vector (d, 1)
     '''
-    return torch.norm(w1 - w2)
+    return np.linalg.norm(w1 - w2)
 
 
 def value_error(v1: torch.tensor,
