@@ -12,7 +12,9 @@ from experiment.loss import weight_error_norm
 from experiment.model import LinearTransformer
 from experiment.prompt import MDPPromptGenerator
 from experiment.utils import (compute_msve, solve_mspbe_weight,
-                              solve_msve_weight)
+                              solve_msve_weight, set_seed)
+
+from experiment.plotter import plot_data, plot_multiple_runs, evaluate_weights
 
 
 def compute_tf_msve(v_tf: np.ndarray,
@@ -48,11 +50,12 @@ def train(d: int,
           manual: bool = False,
           lr: float = 0.001,
           weight_decay=1e-6,
-          n_mdps: int = 10_000,
+          n_mdps: int = 1000,
           mini_batch_size: int = 64,
           n_batch_per_mdp: int = 5,
-          log_interval: int = 20,
-          save_dir: str = None):
+          log_interval: int = 10,
+          save_dir: str = None,
+          random_seed: int = 2):
     '''
     d: feature dimension
     s: number of states
@@ -73,9 +76,8 @@ def train(d: int,
         startTime = datetime.datetime.now()
         save_dir = os.path.join(
             './logs', "discounted_train", startTime.strftime("%Y-%m-%d-%H-%M-%S"))
-    else:
-        save_dir = os.path.join('./logs', "discounted_train", save_dir)
 
+    set_seed(random_seed)
     tf = LinearTransformer(d, n, l, lmbd, mode='auto')
     opt = optim.Adam(tf.parameters(), lr=lr, weight_decay=weight_decay)
 
@@ -140,9 +142,9 @@ def train(d: int,
             log['transformer mspbe'].append(tf_mspbe)
 
             print('Step:', i)
-            print('Transformer Learned Weight:\n', w_tf)
-            print('MSVE Weight:\n', w_msve)
-            print('MSPBE Weight:\n', w_mspbe)
+            #print('Transformer Learned Weight:\n', w_tf)
+            #print('MSVE Weight:\n', w_msve)
+            #print('MSPBE Weight:\n', w_mspbe)
 
     prompt.reset()  # reset prompt for fair testing
     mdp = prompt.mdp
@@ -197,7 +199,8 @@ def train(d: int,
         'n_batch_per_mdp': n_batch_per_mdp,
         'lr': lr,
         'weight_decay': weight_decay,
-        'log_interval': log_interval
+        'log_interval': log_interval,
+        'random_seed': random_seed,
     }
 
     # Save hyperparameters as JSON
@@ -207,81 +210,11 @@ def train(d: int,
     plot_data(log, save_dir)
     evaluate_weights(tf, save_dir)
 
-
-def plot_data(log, save_dir):
-
-    # Loss Plot
-    plt.figure()
-    plt.plot(log['xs'], log['mstde'], label='MSTDE')
-    plt.xlabel('Epochs')
-    plt.ylabel('Loss')
-    plt.title('Loss vs Epochs')
-    plt.legend()
-    plt.savefig(os.path.join(save_dir, 'loss_mstde.png'), dpi=300)
-
-    # Weight norm plot
-    plt.figure()
-    plt.plot(log['xs'], log['msve weight error norm'],
-             label='MSVE Weight Error Norm')
-    plt.plot(log['xs'], log['mspbe weight error norm'],
-             label='MSPBE Weight Error Norm')
-    plt.xlabel('Epochs')
-    plt.ylabel('Weight Error L2 Norm')
-    plt.title('Weight Error Norm vs Epochs')
-    plt.legend()
-    plt.savefig(os.path.join(save_dir, 'weight_error_norm.png'), dpi=300)
-
-    # Value Error Plot
-    plt.figure()
-    plt.plot(log['xs'], log['true msve'], label='True MSVE')
-    plt.plot(log['xs'], log['transformer msve'], label='Transformer MSVE')
-    plt.xlabel('Epochs')
-    plt.ylabel('MSVE')
-    plt.title('MSVE vs Epochs')
-    plt.legend()
-    plt.savefig(os.path.join(save_dir, 'msve.png'), dpi=300)
-
-    # MSPBE Plot
-    plt.figure()
-    plt.plot(log['xs'], log['transformer mspbe'], label='Transformer MSPBE')
-    plt.xlabel('Epochs')
-    plt.ylabel('MSPBE')
-    plt.title('MSPBE vs Epochs')
-    plt.legend()
-    plt.savefig(os.path.join(save_dir, 'mspbe.png'), dpi=300)
-
-
-def evaluate_weights(tf, save_dir):
-    # Save the final P and Q matrices
-    final_P = tf.attn.P.detach().numpy()
-    final_Q = tf.attn.Q.detach().numpy()
-    final_M = tf.attn.M.numpy()
-
-    plt.figure()
-    plt.matshow(final_P)
-    plt.colorbar()
-    plt.title('Final P Matrix')
-    plt.savefig(os.path.join(save_dir, 'final_P.png'), dpi=300)
-
-    plt.figure()
-    plt.matshow(final_Q)
-    plt.colorbar()
-    plt.title('Final Q Matrix')
-    plt.savefig(os.path.join(save_dir, 'final_Q.png'), dpi=300)
-
-    plt.figure()
-    plt.matshow(final_M)
-    plt.colorbar()
-    plt.title('Final M Matrix')
-    plt.savefig(os.path.join(save_dir, 'final_M.png'), dpi=300)
-
 def run_hyperparam_search():
     torch.manual_seed(2)
     np.random.seed(2)
     d = 5
     n = 200
-    # l = 4
-    # s = int(n/10)  # number of states equal to the context length
     s_frac = 10
     for l in [1, 2, 4, 6]:
         for sw in [True, False]:
@@ -289,12 +222,16 @@ def run_hyperparam_search():
             train(d, s, n, l, lmbd=0.0, sample_weight=sw, epochs=25_000,
                   log_interval=250, save_dir='l{layer}_s{s_}_sw{samp_w}'.format(layer=l, s_=s, samp_w=sw))
 
-
 if __name__ == '__main__':
-    torch.manual_seed(2)
-    np.random.seed(2)
     d = 4
-    n = 100
+    n = 150
     l = 3
     s = int(n/10)
-    train(d, s, n, l, lmbd=0.0,  n_mdps=200)
+    startTime = datetime.datetime.now()
+    save_dir = os.path.join(
+            './logs', "discounted_train", startTime.strftime("%Y-%m-%d-%H-%M-%S"))
+    for seed in [2, 3, 42, 123, 456]:
+        train(d, s, n, l, lmbd=0.0,  n_mdps=3000, random_seed=seed, save_dir= os.path.join(save_dir, f'seed_{seed}'))
+    
+
+

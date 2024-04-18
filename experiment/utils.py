@@ -119,10 +119,14 @@ def compute_mspbe(w: np.ndarray,
     mspbe = steady_dist.dot(pbe**2)
     return mspbe.item()
 
+def set_seed(seed):
+    torch.manual_seed(seed)
+    np.random.seed(seed)
+
 
 if __name__ == '__main__':
     from MRP.boyan import BoyanChain
-    np.random.seed(0)
+    set_seed(0)
     X = np.random.randn(10, 3)
     bc = BoyanChain(n_states=10)
     w_msve = solve_msve_weight(bc.steady_d, X, bc.v)
