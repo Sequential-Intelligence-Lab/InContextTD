@@ -10,7 +10,6 @@ class BoyanChain(MRP):
     def __init__(self,
                  n_states: int,
                  gamma: float = 0.9,
-                 initial_dist: np.array = None,
                  weight: np.array = None,
                  X: np.array = None) -> None:
         '''
@@ -30,15 +29,13 @@ class BoyanChain(MRP):
             self.P[i, i + 1] = trans_sample
             self.P[i, i + 2] = 1-trans_sample
         self.P[-2, -1] = 1.0
-        self.P[-1, :] = 1/n_states
+        self.P[-1, :] = np.random.uniform(0.01, 0.99, size=n_states)
+        self.P[-1, :] /= self.P[-1, :].sum()
         assert np.allclose(self.P.sum(axis=1), 1)
         self.steady_d = compute_steady_dist(self.P)
 
-        if initial_dist is not None:
-            self.mu = initial_dist
-        else:
-            # uniform intial distribution
-            self.mu = np.ones(n_states) / n_states
+        self.mu = np.random.uniform(0.01, 0.99, size=n_states)
+        self.mu /= self.mu.sum()
 
         if weight is not None:
             assert X is not None, 'feature matrix X must be provided if weight is given'
@@ -72,3 +69,4 @@ if __name__ == '__main__':
     print('reward\n', bc.r)
     print('value\n', bc.v)
     print('stationary distribution\n', bc.steady_d)
+    print('initial distribution\n', bc.mu)
