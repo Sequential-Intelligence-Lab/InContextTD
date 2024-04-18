@@ -255,6 +255,7 @@ def evaluate_weights(tf, save_dir):
     # Save the final P and Q matrices
     final_P = tf.attn.P.detach().numpy()
     final_Q = tf.attn.Q.detach().numpy()
+    final_M = tf.attn.M.numpy()
 
     plt.figure()
     plt.matshow(final_P)
@@ -268,6 +269,11 @@ def evaluate_weights(tf, save_dir):
     plt.title('Final Q Matrix')
     plt.savefig(os.path.join(save_dir, 'final_Q.png'), dpi=300)
 
+    plt.figure()
+    plt.matshow(final_M)
+    plt.colorbar()
+    plt.title('Final M Matrix')
+    plt.savefig(os.path.join(save_dir, 'final_M.png'), dpi=300)
 
 def run_hyperparam_search():
     torch.manual_seed(2)
@@ -291,4 +297,4 @@ if __name__ == '__main__':
     n = 100
     l = 3
     s = int(n/10)
-    train(d, s, n, l, n_mdps=2000)
+    train(d, s, n, l, lmbd=0.0,  n_mdps=200)
