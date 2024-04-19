@@ -11,6 +11,11 @@ def stack_four(A: torch.Tensor, B: torch.Tensor,
     bottom = torch.cat([C, D], dim=1)
     return torch.cat([top, bottom], dim=0)
 
+def stack_four_np(A: np.ndarray, B: np.ndarray,
+                    C: np.ndarray, D: np.ndarray):
+    top = np.concatenate([A, B], axis=1)
+    bottom = np.concatenate([C, D], axis=1)
+    return np.concatenate([top, bottom], axis=0)
 
 def analytical_weight_update(w_tf: torch.Tensor,
                              Z: torch.Tensor,
@@ -119,10 +124,40 @@ def compute_mspbe(w: np.ndarray,
     mspbe = steady_dist.dot(pbe**2)
     return mspbe.item()
 
-def set_seed(seed):
+def set_seed(seed: int):
     torch.manual_seed(seed)
     np.random.seed(seed)
 
+def compare_P(P_tf: np.ndarray, P_true: np.ndarray):
+    '''
+    P_tf: P matrix from transformer
+    P_true: hardcoded P matrix that implements TD
+    '''
+
+    norm_diff = np.linalg.norm(P_true - P_tf)
+    bottom_right = P_tf[-1,-1]
+    sum_all_others = np.sum(np.abs(P_tf)) - np.abs(P_tf[-1,-1])
+    return norm_diff, bottom_right, sum_all_others
+
+def compare_Q(Q_tf: np.ndarray, Q_true: np.ndarray, d: int):
+    '''
+    Q_tf: Q matrix from transformer
+    Q_true: hardcoded Q matrix that implements TD
+    d: feature dimension
+    '''
+    upper_left_block_trace = np.trace(Q_tf[:d, :d])
+    upper_right_block_trace = np.trace(Q_tf[:d, d+1:2*d+1])
+    sum_all_others = np.sum(np.abs(Q_tf)) - upper_right_block_trace - upper_left_block_trace
+    norm_diff = np.linalg.norm(Q_true - Q_tf)
+
+    return norm_diff, upper_left_block_trace, upper_right_block_trace, sum_all_others
+
+
+# Ensures that the hyperparameters are the same across 2 runs
+def check_params(params, params_0):
+    for key in params.keys().remove('random_seed'):
+        if params[key] != params_0[key]:
+            raise ValueError(f'Parameter {key} is not the same across runs.')
 
 if __name__ == '__main__':
     from MRP.boyan import BoyanChain
