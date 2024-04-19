@@ -12,7 +12,9 @@ from experiment.loss import weight_error_norm
 from experiment.model import LinearTransformer
 from experiment.prompt import MDPPromptGenerator
 from experiment.utils import (compute_msve, solve_mspbe_weight,
-                              solve_msve_weight)
+                              solve_msve_weight, set_seed)
+
+from experiment.plotter import plot_data, plot_multiple_runs, print_final_weights
 
 
 def compute_tf_msve(v_tf: np.ndarray,
@@ -49,11 +51,12 @@ def train(d: int,
           mode: str = 'auto',
           lr: float = 0.001,
           weight_decay=1e-6,
-          n_mdps: int = 10_000,
+          n_mdps: int = 1000,
           mini_batch_size: int = 64,
           n_batch_per_mdp: int = 5,
-          log_interval: int = 20,
-          save_dir: str = None):
+          log_interval: int = 10,
+          save_dir: str = None,
+          random_seed: int = 2):
     '''
     d: feature dimension
     s: number of states
@@ -75,10 +78,9 @@ def train(d: int,
         startTime = datetime.datetime.now()
         save_dir = os.path.join(
             './logs', "discounted_train", startTime.strftime("%Y-%m-%d-%H-%M-%S"))
-    else:
-        save_dir = os.path.join('./logs', "discounted_train", save_dir)
 
-    tf = LinearTransformer(d, n, l, lmbd, mode=mode)
+    set_seed(random_seed)
+    tf = LinearTransformer(d, n, l, lmbd, mode='auto')
     opt = optim.Adam(tf.parameters(), lr=lr, weight_decay=weight_decay)
 
     log = {'xs': [],
@@ -87,7 +89,9 @@ def train(d: int,
            'mspbe weight error norm': [],
            'true msve': [],
            'transformer msve': [],
-           'transformer mspbe': []
+           'transformer mspbe': [],
+            'P': [],
+            'Q': []
            }
 
     pro_gen = MDPPromptGenerator(s, d, n, gamma)
@@ -141,10 +145,13 @@ def train(d: int,
                 v_tf, phi, mdp.P, mdp.r, gamma, mdp.steady_d)
             log['transformer mspbe'].append(tf_mspbe)
 
+            log['P'].append(tf.attn.P.detach().numpy().copy())
+            log['Q'].append(tf.attn.Q.detach().numpy().copy())
+
             print('Step:', i)
-            print('Transformer Learned Weight:\n', w_tf)
-            print('MSVE Weight:\n', w_msve)
-            print('MSPBE Weight:\n', w_mspbe)
+            #print('Transformer Learned Weight:\n', w_tf)
+            #print('MSVE Weight:\n', w_msve)
+            #print('MSPBE Weight:\n', w_mspbe)
 
     prompt.reset()  # reset prompt for fair testing
     mdp = prompt.mdp
@@ -171,6 +178,9 @@ def train(d: int,
 
     tf_mspbe = compute_tf_mspbe(v_tf, phi, mdp.P, mdp.r, gamma, mdp.steady_d)
     log['transformer mspbe'].append(tf_mspbe)
+
+    log['P'].append(tf.attn.P.detach().numpy().copy())
+    log['Q'].append(tf.attn.Q.detach().numpy().copy())
 
     print('Step:', n_mdps)
     print('Transformer Learned Weight:\n', w_tf)
@@ -199,7 +209,8 @@ def train(d: int,
         'n_batch_per_mdp': n_batch_per_mdp,
         'lr': lr,
         'weight_decay': weight_decay,
-        'log_interval': log_interval
+        'log_interval': log_interval,
+        'random_seed': random_seed,
     }
 
     # Save hyperparameters as JSON
@@ -300,12 +311,18 @@ def run_hyperparam_search():
             train(d, s, n, l, lmbd=0.0, sample_weight=sw, epochs=25_000,
                   log_interval=250, save_dir='l{layer}_s{s_}_sw{samp_w}'.format(layer=l, s_=s, samp_w=sw))
 
+    print_final_weights(tf, save_dir)
 
 if __name__ == '__main__':
-    torch.manual_seed(2)
-    np.random.seed(2)
     d = 4
     n = 100
-    l = 3
+    l = 4
     s = int(n/10)
-    train(d, s, n, l, lmbd=0.0,  n_mdps=2000, mode='sequential')
+    startTime = datetime.datetime.now()
+    save_dir = os.path.join(
+            './logs', "discounted_train", startTime.strftime("%Y-%m-%d-%H-%M-%S"))
+    for seed in [1, 2, 3, 42, 456]:
+        train(d, s, n, l, lmbd=0.0,  n_mdps=5000, log_interval=25, random_seed=seed, save_dir= os.path.join(save_dir, f'seed_{seed}'))
+    
+
+

@@ -145,7 +145,8 @@ class MDPPrompt:
 
     def td_update(self,
                   w: torch.Tensor,
-                  C: torch.Tensor = None):
+                  C: torch.Tensor = None,
+                  residual: bool = False):
         '''
         w: weight vector
         C: preconditioning matrix
@@ -154,7 +155,10 @@ class MDPPrompt:
         for j in range(self.n):
             target = self.r[0, j] + w.t() @ self.phi_prime[:, [j]]
             td_error = target - w.t() @ self.phi[:, [j]]
-            u += td_error * self.phi[:, [j]]
+            if residual:
+                u += td_error * (self.phi[:, [j]] - self.phi_prime[:, [j]])
+            else:
+                u += td_error * self.phi[:, [j]]
         u /= self.n
         if C:
             u = C @ u  # apply conditioning matrix
@@ -222,25 +226,3 @@ if __name__ == '__main__':
     print(Z_0)
     Z_1 = mdp_prompt.step()
     print(Z_1)
-
-    # mdp_prompt = MDP_Prompt_Generator(bc, feat, n, eval_len, gamma)
-
-    # print("Features")
-    # print(feat.phi)
-    # print("Z_0")
-    # print(mdp_prompt.z())
-    # print("Context")
-    # print(mdp_prompt.context())
-    # print("Full Sequence")
-    # print(mdp_prompt.full_seq)
-    # for i in range(eval_len-1): # -1 is correct here since we already generate the first prompt upon initialization
-    #     print( f"Prompt {i+1}")
-    #     mdp_prompt.next_prompt()
-    #     print("Z_0 after sliding")
-    #     print(mdp_prompt.z())
-    #     print("Query Features")
-    #     print(mdp_prompt.query_features())
-    #     print("Query Reward")
-    #     print(mdp_prompt.query_state_reward())
-
-    # assert mdp_prompt.z_0.shape == (2*d+1, n+1)

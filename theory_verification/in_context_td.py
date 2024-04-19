@@ -6,7 +6,7 @@ def stack_four(A, B, C, D):
     return np.concatenate([top, bottom], axis=0)
 
 class TFLayer:
-    def __init__(self, d, n):
+    def __init__(self, d, n, semi_grad = True):
         self.d = d
         self.n = n
         self.P = np.zeros((2 * d + 1, 2 * d + 1)) 
@@ -16,23 +16,23 @@ class TFLayer:
         I = np.eye(d)
         O = np.zeros((d, d))
         self.M1 = stack_four(-I, I, O, O)
-        # self.M2 = stack_four(I, O, O, O)
-        # self.C = I 
-        self.C = np.random.randn(d, d) 
+        self.M2 = stack_four(I, O, O, O)
+        self.C = np.eye(d) 
         self.B = stack_four(self.C.T, O, O, O)
         self.A = self.B @ self.M1
         self.Q = np.zeros(self.P.shape)
         self.Q[:2*d, :2*d] = self.A
-        # self.Q = - self.Q
+        if not semi_grad:
+            self.Q = self.Q.T
     
     def forward(self, Z):
         next_Z = Z + 1.0 / self.n * self. P @ Z @ self.M @ Z.T @ self.Q @ Z
         return next_Z
 
 class Transformer:
-    def __init__(self, l, d, n):
+    def __init__(self, l, d, n, semi_grad = True):
         self.n = n
-        self.layers = [TFLayer(d, n) for _ in range(l)]
+        self.layers = [TFLayer(d, n, semi_grad) for _ in range(l)]
         self.Cs = [layer.C for layer in self.layers]
     
     def forward(self, Z):
@@ -58,11 +58,14 @@ class Prompt:
     def z(self):
         return np.concatenate([self.phi, self.phi_prime, self.r], axis=0)
     
-    def td_update(self, w, C):
+    def td_update(self, w, C, semi_grad = True):  
         u = 0
         for j in range(self.n):
-            td_error = self.r[0, j] + w.T @ self.phi_prime[:, [j]] - w.T @ self.phi[:, [j]] 
-            u += td_error * self.phi[:, [j]]
+            td_error = self.r[0, j] + w.T @ self.phi_prime[:, [j]] - w.T @ self.phi[:, [j]]
+            if semi_grad:
+                u += td_error * self.phi[:, [j]]
+            else:
+                u += td_error * (self.phi[:, [j]] - self.phi_prime[:, [j]])
         u /= self.n
         u = C @ u
         w += u
@@ -77,9 +80,9 @@ def g(pro, tf, phi, phi_prime, r):
     return Z
 
 
-def verify(d, n, l):
+def verify(d, n, l, semi_grad = True):
     gamma = 0.9
-    tf = Transformer(l, d, n)
+    tf = Transformer(l, d, n, semi_grad=semi_grad)
     pro = Prompt(d, n, gamma)
     # for _ in range(5):
     #     phi = np.random.randn(d, 1)
@@ -90,13 +93,15 @@ def verify(d, n, l):
     w = np.zeros((d, 1))
     td_value = []
     for i in range(l):
-        w, v = pro.td_update(w, tf.Cs[i])
+        w, v = pro.td_update(w, tf.Cs[i], semi_grad=semi_grad)
         td_value.append(v)
     td_value = np.array(td_value).flatten()
     print(tf_value - td_value)
 # 
 if __name__ == '__main__':
-    verify(4, 9, 10)
+    verify(4, 9, 5)
+    # verify residual gradient
+    verify(4,9, 1, semi_grad=False)
 
 
 
