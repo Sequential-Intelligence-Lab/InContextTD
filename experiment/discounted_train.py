@@ -46,6 +46,7 @@ def train(d: int,
           lmbd: float = 0.0,
           sample_weight: bool = False,
           manual: bool = False,
+          mode: str = 'auto',
           lr: float = 0.001,
           weight_decay=1e-6,
           n_mdps: int = 10_000,
@@ -61,9 +62,10 @@ def train(d: int,
     gamma: discount factor
     lmbd: eligibility trace decay
     sample_weight: sample a random true weight vector
+    manual: whether to use manual weight extraction or not
+    mode: 'auto' or 'sequential'
     lr: learning rate
     weight_decay: regularization
-    Epochs: number of training Epochs
     log_interval: logging interval
     save_dir: directory to save logs
     mini_batch_size: mini batch size
@@ -76,7 +78,7 @@ def train(d: int,
     else:
         save_dir = os.path.join('./logs', "discounted_train", save_dir)
 
-    tf = LinearTransformer(d, n, l, lmbd, mode='auto')
+    tf = LinearTransformer(d, n, l, lmbd, mode=mode)
     opt = optim.Adam(tf.parameters(), lr=lr, weight_decay=weight_decay)
 
     log = {'xs': [],
@@ -252,28 +254,37 @@ def plot_data(log, save_dir):
 
 
 def evaluate_weights(tf, save_dir):
-    # Save the final P and Q matrices
-    final_P = tf.attn.P.detach().numpy()
-    final_Q = tf.attn.Q.detach().numpy()
-    final_M = tf.attn.M.numpy()
+    if tf.mode == 'auto':
+        # Save the final P and Q matrices
+        final_P = tf.attn.P.detach().numpy()
+        final_P /= np.max(np.abs(final_P))
+        final_Q = tf.attn.Q.detach().numpy()
+        final_Q /= np.max(np.abs(final_Q))
 
-    plt.figure()
-    plt.matshow(final_P)
-    plt.colorbar()
-    plt.title('Final P Matrix')
-    plt.savefig(os.path.join(save_dir, 'final_P.png'), dpi=300)
+        fig, axs = plt.subplots(nrows=1, ncols=2, figsize=(10, 5), sharey=True)
+        cax1 = axs[0].matshow(final_P, vmin=-1, vmax=1, cmap='gray')
+        axs[0].set_title('Final P Matrix')
+        axs[1].matshow(final_Q, vmin=-1, vmax=1, cmap='gray')
+        axs[1].set_title('Final Q Matrix')
+        fig.colorbar(cax1, ax=axs, orientation='vertical')
+        plt.savefig(os.path.join(save_dir, 'final_PQ.png'), dpi=300)
+        plt.close(fig)
+    else: # sequential
+        for l, layer in enumerate(tf.layers):
+            final_P = layer.P.detach().numpy()
+            final_P /= np.max(np.abs(final_P))
+            final_Q = layer.Q.detach().numpy()
+            final_Q /= np.max(np.abs(final_Q))
 
-    plt.figure()
-    plt.matshow(final_Q)
-    plt.colorbar()
-    plt.title('Final Q Matrix')
-    plt.savefig(os.path.join(save_dir, 'final_Q.png'), dpi=300)
+            fig, axs = plt.subplots(nrows=1, ncols=2, figsize=(10, 5), sharey=True)
+            cax1 = axs[0].matshow(final_P, vmin=-1, vmax=1, cmap='gray')
+            axs[0].set_title(f'Final P Matrix Layer {l+1}')
+            axs[1].matshow(final_Q, vmin=-1, vmax=1, cmap='gray')
+            axs[1].set_title(f'Final Q Matrix Layer {l+1}')
+            fig.colorbar(cax1, ax=axs, orientation='vertical')
+            plt.savefig(os.path.join(save_dir, f'final_PQ_{l+1}.png'), dpi=300)
+            plt.close(fig)
 
-    plt.figure()
-    plt.matshow(final_M)
-    plt.colorbar()
-    plt.title('Final M Matrix')
-    plt.savefig(os.path.join(save_dir, 'final_M.png'), dpi=300)
 
 def run_hyperparam_search():
     torch.manual_seed(2)
@@ -297,4 +308,4 @@ if __name__ == '__main__':
     n = 100
     l = 3
     s = int(n/10)
-    train(d, s, n, l, lmbd=0.0,  n_mdps=200)
+    train(d, s, n, l, lmbd=0.0,  n_mdps=2000, mode='sequential')
