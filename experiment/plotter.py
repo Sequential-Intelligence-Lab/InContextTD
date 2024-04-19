@@ -23,19 +23,22 @@ def plot_multiple_runs(data_dirs, save_dir):
 
     # Initialize lists to store data
     log, params_0 = load_data(data_dirs[0])
-    data_logs = {category: [] for category in log.keys() if category != 'P' and category != 'Q'}
+    data_logs = {category: [] for category in log.keys()}
 
     # Load data from directories
     for data_dir in data_dirs:
         log, params = load_data(data_dir)
         check_params(params, params_0)
-        for category in [k for k in log.keys() if k != 'P' and k != 'Q']:
+        log = negate_matrices_if_needed(log)
+        for category in log.keys():
             data_logs[category].append(log[category])
 
     # Compute the axis=0 mean for all the categories
     mean_logs = {category: np.mean(data_logs[category], axis=0) for category in data_logs.keys()}
     std_logs = {category: np.std(data_logs[category], axis=0) for category in data_logs.keys()}
-    for category in mean_logs.keys():
+
+    # plot all the metrics
+    for category in [key for key in mean_logs.keys() if key != 'P' and key != 'Q']:
         plt.figure()
         plt.xlabel('Epochs')
         plt.ylabel(category)
@@ -43,6 +46,16 @@ def plot_multiple_runs(data_dirs, save_dir):
         plt.plot(mean_logs['xs'], mean_logs[category])
         plt.fill_between(mean_logs['xs'], mean_logs[category] - std_logs[category], mean_logs[category] + std_logs[category], alpha=0.2)
         plt.savefig(os.path.join(save_dir, f'{category}.png'), dpi=300)
+        plt.close()
+    
+    # plot the averaged final matrices
+    #import pdb; pdb.set_trace()
+    for key in ['P', 'Q']:
+        plt.figure()
+        plt.matshow(mean_logs[key][-1])
+        plt.colorbar()
+        plt.title(f'Final {key} Matrix')
+        plt.savefig(os.path.join(save_dir, f'avg_final_{key}.png'), dpi=300)
         plt.close()
    
 
