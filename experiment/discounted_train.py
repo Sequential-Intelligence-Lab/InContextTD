@@ -14,7 +14,7 @@ from experiment.prompt import MDPPromptGenerator
 from experiment.utils import (compute_msve, solve_mspbe_weight,
                               solve_msve_weight, set_seed)
 
-from experiment.plotter import plot_data, plot_multiple_runs, evaluate_weights
+from experiment.plotter import plot_data, plot_multiple_runs, print_final_weights
 
 
 def compute_tf_msve(v_tf: np.ndarray,
@@ -87,7 +87,9 @@ def train(d: int,
            'mspbe weight error norm': [],
            'true msve': [],
            'transformer msve': [],
-           'transformer mspbe': []
+           'transformer mspbe': [],
+            'P': [],
+            'Q': []
            }
 
     pro_gen = MDPPromptGenerator(s, d, n, gamma)
@@ -141,6 +143,9 @@ def train(d: int,
                 v_tf, phi, mdp.P, mdp.r, gamma, mdp.steady_d)
             log['transformer mspbe'].append(tf_mspbe)
 
+            log['P'].append(tf.attn.P.detach().numpy().copy())
+            log['Q'].append(tf.attn.Q.detach().numpy().copy())
+
             print('Step:', i)
             #print('Transformer Learned Weight:\n', w_tf)
             #print('MSVE Weight:\n', w_msve)
@@ -171,6 +176,9 @@ def train(d: int,
 
     tf_mspbe = compute_tf_mspbe(v_tf, phi, mdp.P, mdp.r, gamma, mdp.steady_d)
     log['transformer mspbe'].append(tf_mspbe)
+
+    log['P'].append(tf.attn.P.detach().numpy().copy())
+    log['Q'].append(tf.attn.Q.detach().numpy().copy())
 
     print('Step:', n_mdps)
     print('Transformer Learned Weight:\n', w_tf)
@@ -208,30 +216,18 @@ def train(d: int,
         json.dump(hyperparameters, f)
 
     plot_data(log, save_dir)
-    evaluate_weights(tf, save_dir)
-
-def run_hyperparam_search():
-    torch.manual_seed(2)
-    np.random.seed(2)
-    d = 5
-    n = 200
-    s_frac = 10
-    for l in [1, 2, 4, 6]:
-        for sw in [True, False]:
-            s = int(n/s_frac)
-            train(d, s, n, l, lmbd=0.0, sample_weight=sw, epochs=25_000,
-                  log_interval=250, save_dir='l{layer}_s{s_}_sw{samp_w}'.format(layer=l, s_=s, samp_w=sw))
+    print_final_weights(tf, save_dir)
 
 if __name__ == '__main__':
     d = 4
-    n = 150
-    l = 3
+    n = 100
+    l = 4
     s = int(n/10)
     startTime = datetime.datetime.now()
     save_dir = os.path.join(
             './logs', "discounted_train", startTime.strftime("%Y-%m-%d-%H-%M-%S"))
-    for seed in [2, 3, 42, 123, 456]:
-        train(d, s, n, l, lmbd=0.0,  n_mdps=3000, random_seed=seed, save_dir= os.path.join(save_dir, f'seed_{seed}'))
+    for seed in [1, 2, 3, 42, 456]:
+        train(d, s, n, l, lmbd=0.0,  n_mdps=5000, log_interval=25, random_seed=seed, save_dir= os.path.join(save_dir, f'seed_{seed}'))
     
 
 
