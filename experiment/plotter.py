@@ -23,13 +23,13 @@ def plot_multiple_runs(data_dirs, save_dir):
 
     # Initialize lists to store data
     log, params_0 = load_data(data_dirs[0])
-    data_logs = {category: [] for category in log.keys()}
+    data_logs = {category: [] for category in log.keys() if category != 'P' and category != 'Q'}
 
     # Load data from directories
     for data_dir in data_dirs:
         log, params = load_data(data_dir)
         check_params(params, params_0)
-        for category in log.keys():
+        for category in [k for k in log.keys() if k != 'P' and k != 'Q']:
             data_logs[category].append(log[category])
 
     # Compute the axis=0 mean for all the categories
@@ -117,10 +117,10 @@ def print_final_weights(tf, save_dir):
     plt.title('Final M Matrix')
     plt.savefig(os.path.join(save_dir, 'final_M.png'), dpi=300)
 
-def evaluate_weights(data_dirs, save_dir):
-    log, params_0 = load_data(data_dir)
-    data_logs = {key: [] for key in ['P_norm_diff', 'P_bottom_right', 'P_sum_abs_all_others', 
-                                 'Q_norm_diff', 'Q_upper_left_trace', 'Q_upper_right_trace', 'Q_sum_abs_all_others']}
+def evaluate_weights(data_dirs, save_dir, debug=False):
+    log, params_0 = load_data(data_dirs[0])
+    data_logs = {key: [] for key in ['P_norm_diff', 'P_bottom_right', 'P_avg_abs_all_others', 
+                                 'Q_norm_diff', 'Q_upper_left_trace', 'Q_upper_right_trace', 'Q_avg_abs_all_others']}
     d = params_0['d']
 
     # compute the hardcoded P and Q matrices that implement TD
@@ -173,21 +173,21 @@ def negate_matrices_if_needed(log):
     return log
 
 def compute_metrics(log, P_true, Q_true, d):
-    P_metrics = {'norm_diff': [], 'bottom_right': [], 'sum_abs_all_others': []}
-    Q_metrics = {'norm_diff': [], 'upper_left_trace': [], 'upper_right_trace': [], 'sum_abs_all_others': []}
+    P_metrics = {'norm_diff': [], 'bottom_right': [], 'avg_abs_all_others': []}
+    Q_metrics = {'norm_diff': [], 'upper_left_trace': [], 'upper_right_trace': [], 'avg_abs_all_others': []}
     
     for P_tf in log['P']:
-        P_norm_diff, P_bottom_right, P_sum_all_others = compare_P(P_tf, P_true)
+        P_norm_diff, P_bottom_right, P_sum_all_others = compare_P(P_tf, P_true, d)
         P_metrics['norm_diff'].append(P_norm_diff)
         P_metrics['bottom_right'].append(P_bottom_right)
-        P_metrics['sum_abs_all_others'].append(P_sum_all_others)
+        P_metrics['avg_abs_all_others'].append(P_sum_all_others)
 
     for Q_tf in log['Q']:
         Q_norm_diff, Q_upper_left_trace, Q_upper_right_trace, Q_sum_all_others = compare_Q(Q_tf, Q_true, d)
         Q_metrics['norm_diff'].append(Q_norm_diff)
         Q_metrics['upper_left_trace'].append(Q_upper_left_trace)
         Q_metrics['upper_right_trace'].append(Q_upper_right_trace)
-        Q_metrics['sum_abs_all_others'].append(Q_sum_all_others)
+        Q_metrics['avg_abs_all_others'].append(Q_sum_all_others)
 
     return P_metrics, Q_metrics
 
@@ -198,8 +198,7 @@ def update_data_logs(data_logs, P_metrics, Q_metrics):
         data_logs[f'Q_{key}'].append(Q_metrics[key])
 
 if __name__ == '__main__':
-    runs_directory = os.path.join('./logs', 'discounted_train', '2024-04-18-17-54-26')
+    runs_directory = os.path.join('./logs', 'discounted_train', '2024-04-18-21-07-30')
     runs_to_plot = [run for run in os.listdir(runs_directory) if run.startswith('seed')]
-    #import pdb; pdb.set_trace()
-    #plot_multiple_runs([os.path.join(runs_directory, run) for run in runs_to_plot], runs_directory)
+    plot_multiple_runs([os.path.join(runs_directory, run) for run in runs_to_plot], runs_directory)
     evaluate_weights([os.path.join(runs_directory, run) for run in runs_to_plot], runs_directory)
