@@ -46,7 +46,9 @@ def _init_log() -> dict:
            'transformer msve': [],
            'transformer mspbe': [],
            'P': [],
-           'Q': []
+           'Q': [],
+           'implicit w_tf and w_td cos sim': [],
+           'w_tf_w_td_diff_l2': []
            }
     return log
 
@@ -160,6 +162,10 @@ def train(d: int,
             tf_mspbe = compute_tf_mspbe(
                 v_tf, phi, mdp.P, mdp.r, gamma, mdp.steady_d)
             log['transformer mspbe'].append(tf_mspbe)
+
+            w_tf_w_td_cos_sim, w_tf_w_td_diff_l2= compare_tf_td_weight(tf, prompt)
+            log['implicit w_tf and w_td cos sim'].append(w_tf_w_td_cos_sim)
+            log['w_tf_w_td_diff_l2'].append(w_tf_w_td_diff_l2)
 
             if mode=='auto':
                 log['P'].append([tf.attn.P.detach().numpy().copy()])
