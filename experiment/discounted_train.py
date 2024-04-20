@@ -187,6 +187,7 @@ def train(d: int,
         'weight_decay': weight_decay,
         'log_interval': log_interval,
         'random_seed': random_seed,
+        'mode': mode
     }
 
     # Save hyperparameters as JSON
