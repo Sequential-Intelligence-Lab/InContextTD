@@ -106,28 +106,38 @@ def plot_data(log, save_dir):
 
 
 def print_final_weights(tf, save_dir):
-    # Save the final P and Q matrices
-    final_P = tf.attn.P.detach().numpy()
-    final_Q = tf.attn.Q.detach().numpy()
-    final_M = tf.attn.M.numpy()
+    def scale(matrix: np.ndarray):
+        return matrix / np.max(np.abs(matrix))
+    if tf.mode == 'auto':
+        # Save the final P and Q matrices
+        final_P = scale(tf.attn.P.detach().numpy())
+        final_P *= np.sign(final_P[-1, -1])
+        final_Q = scale(tf.attn.Q.detach().numpy())
+        final_Q *= np.sign(final_P[-1, -1])
 
-    plt.figure()
-    plt.matshow(final_P)
-    plt.colorbar()
-    plt.title('Final P Matrix')
-    plt.savefig(os.path.join(save_dir, 'final_P.png'), dpi=300)
+        fig, axs = plt.subplots(nrows=1, ncols=2, figsize=(10, 5), sharey=True)
+        cax1 = axs[0].matshow(final_P, vmin=-1, vmax=1)
+        axs[0].set_title('Final P Matrix')
+        axs[1].matshow(final_Q, vmin=-1, vmax=1)
+        axs[1].set_title('Final Q Matrix')
+        fig.colorbar(cax1, ax=axs, orientation='vertical')
+        plt.savefig(os.path.join(save_dir, 'final_PQ.png'), dpi=300)
+        plt.close(fig)
+    else: # sequential
+        for l, layer in enumerate(tf.layers):
+            final_P = scale(layer.P.detach().numpy())
+            final_P *= np.sign(final_P[-1, -1])
+            final_Q = scale(layer.Q.detach().numpy())
+            final_Q *= np.sign(final_P[-1, -1])
 
-    plt.figure()
-    plt.matshow(final_Q)
-    plt.colorbar()
-    plt.title('Final Q Matrix')
-    plt.savefig(os.path.join(save_dir, 'final_Q.png'), dpi=300)
-
-    plt.figure()
-    plt.matshow(final_M)
-    plt.colorbar()
-    plt.title('Final M Matrix')
-    plt.savefig(os.path.join(save_dir, 'final_M.png'), dpi=300)
+            fig, axs = plt.subplots(nrows=1, ncols=2, figsize=(10, 5), sharey=True)
+            cax1 = axs[0].matshow(final_P, vmin=-1, vmax=1)
+            axs[0].set_title(f'Final P Matrix Layer {l+1}')
+            axs[1].matshow(final_Q, vmin=-1, vmax=1)
+            axs[1].set_title(f'Final Q Matrix Layer {l+1}')
+            fig.colorbar(cax1, ax=axs, orientation='vertical')
+            plt.savefig(os.path.join(save_dir, f'final_PQ_{l+1}.png'), dpi=300)
+            plt.close(fig)
 
 def evaluate_weights(data_dirs, save_dir, debug=False):
     log, params_0 = load_data(data_dirs[0])
