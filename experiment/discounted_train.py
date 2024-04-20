@@ -65,7 +65,7 @@ def _init_save_dir(save_dir: str) -> None:
 def _save_log(log: dict, save_dir: str) -> None:
     for key, value in log.items():
         log[key] = np.array(value)
-    np.savez(os.path.join(save_dir, 'discounted_train.npz'), **log)
+    np.savez(os.path.join(save_dir, 'data.npz'), **log)
 
 
 def train(d: int,

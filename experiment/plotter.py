@@ -9,9 +9,9 @@ from experiment.utils import compare_P, compare_Q, check_params, stack_four_np
 def load_data(data_dir):
     """Load data from specified directory and return the relevant metrics."""
 
-    with open(os.path.join(data_dir, 'discounted_train.pkl'), 'rb') as train_file, \
+    with np.load(os.path.join(data_dir, 'data.npz')) as data, \
          open(os.path.join(data_dir, 'params.json'), 'r') as params_file:
-        log = pickle.load(train_file)
+        log = {key: data[key] for key in data}
         params = json.load(params_file)  # Assuming params is used somewhere else
 
     return log, params
