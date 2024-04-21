@@ -1,6 +1,6 @@
 import json
 import os
-from typing import List
+from typing import List, Tuple
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -9,8 +9,10 @@ from experiment.utils import (check_params, compare_P, compare_Q,
                               get_hardcoded_P, get_hardcoded_Q)
 
 
-def load_data(data_dir):
-    """Load data from specified directory and return the relevant metrics."""
+def load_data(data_dir: str) -> Tuple[dict, dict]:
+    """
+    Load data from specified directory and return the relevant metrics.
+    """
 
     with np.load(os.path.join(data_dir, 'data.npz')) as data, \
             open(os.path.join(data_dir, 'params.json'), 'r') as params_file:
@@ -20,7 +22,11 @@ def load_data(data_dir):
     return log, params
 
 
-def process_log(log: dict):
+def process_log(log: dict) -> Tuple[np.ndarray, dict, dict]:
+    '''
+    parse the log dictionary
+    return the x ticks, error log, and aligned attention parameters
+    '''
     Ps, Qs = log['P'], log['Q']
     aligned_Ps, aligned_Qs = align_matrix_sign(Ps, Qs)
     attn_params = {'P': aligned_Ps, 'Q': aligned_Qs}
@@ -37,13 +43,22 @@ def process_log(log: dict):
     return log['xs'], error_log, attn_params
 
 
-def _batch_runs(logs: List[dict]):
+def _batch_runs(logs: List[dict]) -> dict:
+    '''
+    batch the logs from multiple runs
+    '''
     keys = logs[0].keys()
     batched_logs = {key: np.vstack([log[key] for log in logs]) for key in keys}
     return batched_logs
 
 
-def plot_multiple_runs(data_dirs, save_dir):
+def plot_multiple_runs(data_dirs: List[str],
+                       save_dir: str) -> None:
+    '''
+    data_dirs: list of directories containing the data
+    save_dir: directory to save the plots
+    plot the data from multiple runs
+    '''
     # Create directory if it doesn't exist
     if not os.path.exists(save_dir):
         os.makedirs(save_dir)
@@ -51,48 +66,39 @@ def plot_multiple_runs(data_dirs, save_dir):
     log, params_0 = load_data(data_dirs[0])
 
     error_log_lst = []
+    P_metrics_lst = []
+    Q_metrics_lst = []
     # Load data from directories
     for data_dir in data_dirs:
         log, params = load_data(data_dir)
+        d, l = params['d'], params['l']
         check_params(params, params_0)
         xs, error_log, attn_params = process_log(log)
         error_log_lst.append(error_log)
+        P_metrics, Q_metrics = compute_weight_metrics(attn_params,
+                                                      get_hardcoded_P(d),
+                                                      get_hardcoded_Q(d),
+                                                      d)
+        P_metrics_lst.append(P_metrics)
+        Q_metrics_lst.append(Q_metrics)
 
     batched_error_log = _batch_runs(error_log_lst)
     plot_error_data(xs, batched_error_log, save_dir)
 
-    # Compute the axis=0 mean for all the categories
-    # mean_logs = {category: np.mean(
-    #     data_logs[category], axis=0) for category in data_logs.keys()}
-    # std_logs = {category: np.std(
-    #     data_logs[category], axis=0) for category in data_logs.keys()}
-
-    # # plot all the metrics
-    # for category in [key for key in mean_logs.keys() if key != 'P' and key != 'Q']:
-    #     plt.figure()
-    #     plt.xlabel('Epochs')
-    #     plt.ylabel(category)
-    #     plt.title(
-    #         f'{category} vs Epochs (l={params["l"]}, s={params["s"]}, sw={params["sample_weight"]})')
-    #     plt.plot(mean_logs['xs'], mean_logs[category])
-    #     plt.fill_between(mean_logs['xs'], mean_logs[category] - std_logs[category],
-    #                      mean_logs[category] + std_logs[category], alpha=0.2)
-    #     plt.savefig(os.path.join(save_dir, f'{category}.png'), dpi=300)
-    #     plt.close()
-
-    # # plot the averaged final matrices
-    # for key in ['P', 'Q']:
-    #     plt.figure()
-    #     plt.matshow(mean_logs[key][-1])
-    #     plt.colorbar()
-    #     plt.title(f'Final {key} Matrix')
-    #     plt.savefig(os.path.join(save_dir, f'avg_final_{key}.png'), dpi=300)
-    #     plt.close()
+    batched_Q_metrics = _batch_runs(Q_metrics_lst)
+    batched_P_metrics = _batch_runs(P_metrics_lst)
+    plot_weight_metrics(xs, l, batched_P_metrics, batched_Q_metrics, save_dir)
 
 
 def plot_error_data(xs: np.ndarray,
                     error_log: dict,
-                    save_dir: str):
+                    save_dir: str) -> None:
+    '''
+    plot the error data from validation
+    xs: x-axis values
+    error_log: dictionary containing the error data
+    save_dir: directory to save the plots
+    '''
 
     # MSTDE
     mean_mstde = np.mean(error_log['mstde'], axis=0)
@@ -171,7 +177,14 @@ def plot_error_data(xs: np.ndarray,
 def plot_attention_params(xs: np.ndarray,
                           params: dict,
                           save_dir: str,
-                          log_step: int = -1):
+                          log_step: int = -1) -> None:
+    '''
+    visualize the attention parameters at a specific time step
+    xs: x-axis values
+    params: attention parameters
+    save_dir: directory to save the plots
+    log_step: time step to visualize
+    '''
     Ps, Qs = params['P'], params['Q']  # both have shape (T, l, 2d+1, 2d+1)
     assert Ps.shape == Qs.shape
     ckpt = xs[log_step]
@@ -193,52 +206,88 @@ def plot_attention_params(xs: np.ndarray,
         plt.close(fig)
 
 
-def evaluate_weights(data_dirs, save_dir, debug=False):
-    log, params_0 = load_data(data_dirs[0])
-    data_logs = {key: [] for key in ['P_norm_diff', 'P_bottom_right', 'P_avg_abs_all_others',
-                                     'Q_norm_diff', 'Q_upper_left_trace', 'Q_upper_right_trace', 'Q_avg_abs_all_others']}
-    d = params_0['d']
+def plot_weight_metrics(xs: np.ndarray,
+                        l: int,
+                        P_metrics: dict,
+                        Q_metrics: dict,
+                        save_dir: str) -> None:
+    '''
+    plot the metrics for P and Q
+    xs: x-axis values
+    l: number of layers
+    P_metrics: metrics for P matrix
+    Q_metrics: metrics for Q matrix
+    save_dir: directory to save the plots
+    '''
+    # same layer, different metrics
+    for i in range(l):
+        plt.figure()
+        for key, metric in P_metrics.items():
+            mean_metric = np.mean(metric, axis=0)  # shape (T, l)
+            std_metric = np.std(metric, axis=0)
+            assert mean_metric.shape == std_metric.shape
+            plt.plot(xs, mean_metric[:, i], label=key.replace('_', ' '))
+            plt.fill_between(xs, mean_metric[:, i] - std_metric[:, i],
+                             mean_metric[:, i] + std_metric[:, i], alpha=0.2)
+            plt.xlabel('# MDPs')
+            plt.title(f'Transformer P Matrix Layer {i+1} Metrics')
+            plt.legend()
+        plt.savefig(os.path.join(save_dir, f'P_metrics_{i+1}.png'), dpi=300)
+        plt.close()
 
-    # compute the hardcoded P and Q matrices that implement TD
-    P_true = get_hardcoded_P(d)
-    Q_true = get_hardcoded_Q(d)
+    # same metric, different layers
+    for key, metric in P_metrics.items():
+        mean_metric = np.mean(metric, axis=0)  # shape (T, l)
+        std_metric = np.std(metric, axis=0)
+        assert mean_metric.shape == std_metric.shape
+        plt.figure()
+        for i in range(l):
+            plt.plot(xs, mean_metric[:, i], label=f'layer={i+1}')
+            plt.fill_between(xs, mean_metric[:, i] - std_metric[:, i],
+                             mean_metric[:, i] + std_metric[:, i], alpha=0.2)
+            plt.xlabel('# MDPs')
+            plt.title(f'Transformer P Matrix {key.replace("_", " ").title()}')
+            plt.legend()
+        plt.savefig(os.path.join(save_dir, f'P_{key}.png'), dpi=300)
+        plt.close()
 
-    for data_dir in data_dirs:
-        log, params = load_data(data_dir)
-        check_params(params, params_0)
-        log = align_matrix_sign(log)
-        P_metrics, Q_metrics = compute_metrics(log, P_true, Q_true, d)
-        update_data_logs(data_logs, P_metrics, Q_metrics)
+    # same layer, different metrics
+    for i in range(l):
+        plt.figure()
+        for key, metric in Q_metrics.items():
+            mean_metric = np.mean(metric, axis=0)
+            std_metric = np.std(metric, axis=0)
+            assert mean_metric.shape == std_metric.shape
+            plt.plot(xs, mean_metric[:, i], label=key.replace('_', ' '))
+            plt.fill_between(xs, mean_metric[:, i] - std_metric[:, i],
+                             mean_metric[:, i] + std_metric[:, i], alpha=0.2)
+            plt.xlabel('# MDPs')
+            plt.title(f'Transformer Q Matrix Layer {i+1} Metrics')
+            plt.legend()
+        plt.savefig(os.path.join(save_dir, f'Q_metrics_{i+1}.png'), dpi=300)
+        plt.close()
 
-    mean_logs = {category: np.mean(
-        data_logs[category], axis=0) for category in data_logs.keys()}
-    std_logs = {category: np.std(
-        data_logs[category], axis=0) for category in data_logs.keys()}
-
-    p_keys = [key for key in mean_logs.keys() if key.startswith('P')]
-    q_keys = [key for key in mean_logs.keys() if key.startswith('Q')]
-    plt.figure()
-    for key in p_keys:
-        plt.plot(log['xs'], mean_logs[key], label=key)
-        plt.fill_between(log['xs'], mean_logs[key] - std_logs[key],
-                         mean_logs[key] + std_logs[key], alpha=0.2)
-    plt.xlabel('Epochs')
-    plt.title('Transformer P Matrix Metrics')
-    plt.legend()
-    plt.savefig(os.path.join(save_dir, 'P_metrics.png'), dpi=300)
-
-    plt.figure()
-    for key in q_keys:
-        plt.plot(log['xs'], mean_logs[key], label=key)
-        plt.fill_between(log['xs'], mean_logs[key] - std_logs[key],
-                         mean_logs[key] + std_logs[key], alpha=0.2)
-    plt.xlabel('Epochs')
-    plt.title('Transformer Q Matrix Metrics')
-    plt.legend()
-    plt.savefig(os.path.join(save_dir, 'Q_metrics.png'), dpi=300)
+    # same metric, different layers
+    for key, metric in Q_metrics.items():
+        mean_metric = np.mean(metric, axis=0)
+        std_metric = np.std(metric, axis=0)
+        assert mean_metric.shape == std_metric.shape
+        plt.figure()
+        for i in range(l):
+            plt.plot(xs, mean_metric[:, i], label=f'layer={i+1}')
+            plt.fill_between(xs, mean_metric[:, i] - std_metric[:, i],
+                             mean_metric[:, i] + std_metric[:, i], alpha=0.2)
+            plt.xlabel('# MDPs')
+            plt.title(f'Transformer Q Matrix {key.replace("_", " ").title()}')
+            plt.legend()
+        plt.savefig(os.path.join(save_dir, f'Q_{key}.png'), dpi=300)
+        plt.close()
 
 
-def align_matrix_sign(Ps: np.ndarray, Qs: np.ndarray):
+def align_matrix_sign(Ps: np.ndarray, Qs: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+    '''
+    align the sign of the matrices using the sign of the bottom right element of P
+    '''
     aligned_Ps = []
     aligned_Qs = []
     for P_mats, Q_mats in zip(Ps, Qs):  # shape (l, 2d+1, 2d+1)
@@ -252,12 +301,23 @@ def align_matrix_sign(Ps: np.ndarray, Qs: np.ndarray):
     return np.array(aligned_Ps), np.array(aligned_Qs)
 
 
-def compute_metrics(log, P_true, Q_true, d):
+def compute_weight_metrics(attn_params: dict,
+                           P_true: np.ndarray,
+                           Q_true: np.ndarray,
+                           d: int) -> Tuple[dict, dict]:
+    '''
+    compute the metrics for the attention parameters
+    attn_params: attention parameters from the transformer
+    P_true: hard coded true P matrix
+    Q_true: hard coded true Q matrix
+    d: feature dimension
+    '''
+
     P_metrics = {'norm_diff': [], 'bottom_right': [], 'avg_abs_all_others': []}
     Q_metrics = {'norm_diff': [], 'upper_left_trace': [],
                  'upper_right_trace': [], 'avg_abs_all_others': []}
 
-    for P_t in log['P']:  # shape (l, 2d+1, 2d+1)
+    for P_t in attn_params['P']:  # shape (l, 2d+1, 2d+1)
         norm_diff_layers = []
         bottom_right_layers = []
         avg_abs_all_others_layers = []
@@ -271,9 +331,9 @@ def compute_metrics(log, P_true, Q_true, d):
         P_metrics['bottom_right'].append(bottom_right_layers)
         P_metrics['avg_abs_all_others'].append(avg_abs_all_others_layers)
     for key, value in P_metrics.items():
-        P_metrics[key] = np.array(value)
+        P_metrics[key] = np.array([value])  # shape (1, T, l)
 
-    for Q_t in log['Q']:  # shape (l, 2d+1, 2d+1)
+    for Q_t in attn_params['Q']:  # shape (l, 2d+1, 2d+1)
         norm_diff_layers = []
         upper_left_trace_layers = []
         upper_right_trace_layers = []
@@ -281,21 +341,18 @@ def compute_metrics(log, P_true, Q_true, d):
         for Q_layer in Q_t:  # shape (2d+1, 2d+1)
             norm_diff, upper_left_trace, upper_right_trace, avg_abs_all_others = compare_Q(
                 Q_layer, Q_true, d)
-            Q_metrics['norm_diff'].append(norm_diff)
-            Q_metrics['upper_left_trace'].append(upper_left_trace)
-            Q_metrics['upper_right_trace'].append(upper_right_trace)
-            Q_metrics['avg_abs_all_others'].append(avg_abs_all_others)
+            norm_diff_layers.append(norm_diff)
+            upper_left_trace_layers.append(upper_left_trace)
+            upper_right_trace_layers.append(upper_right_trace)
+            avg_abs_all_others_layers.append(avg_abs_all_others)
+        Q_metrics['norm_diff'].append(norm_diff_layers)
+        Q_metrics['upper_left_trace'].append(upper_left_trace_layers)
+        Q_metrics['upper_right_trace'].append(upper_right_trace_layers)
+        Q_metrics['avg_abs_all_others'].append(avg_abs_all_others_layers)
     for key, value in Q_metrics.items():
-        Q_metrics[key] = np.array(value)
+        Q_metrics[key] = np.array([value])  # shape (1, T, l)
 
     return P_metrics, Q_metrics
-
-
-def update_data_logs(data_logs, P_metrics, Q_metrics):
-    for key in P_metrics:
-        data_logs[f'P_{key}'].append(P_metrics[key])
-    for key in Q_metrics:
-        data_logs[f'Q_{key}'].append(Q_metrics[key])
 
 
 if __name__ == '__main__':
@@ -305,5 +362,3 @@ if __name__ == '__main__':
         runs_directory) if run.startswith('seed')]
     plot_multiple_runs([os.path.join(runs_directory, run)
                        for run in runs_to_plot], runs_directory)
-    evaluate_weights([os.path.join(runs_directory, run)
-                     for run in runs_to_plot], runs_directory)

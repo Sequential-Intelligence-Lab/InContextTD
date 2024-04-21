@@ -6,15 +6,16 @@ import pickle
 import numpy as np
 import torch
 import torch.optim as optim
+from tqdm import tqdm
 
 from experiment.loss import weight_error_norm
 from experiment.model import LinearTransformer
+from experiment.plotter import (load_data, plot_attention_params,
+                                plot_multiple_runs)
 from experiment.prompt import MDPPromptGenerator
-from experiment.utils import (compute_msve, solve_mspbe_weight,
-                              solve_msve_weight, set_seed)
+from experiment.utils import (compute_msve, set_seed, solve_mspbe_weight,
+                              solve_msve_weight)
 
-from experiment.plotter import plot_multiple_runs, plot_attention_params, load_data
-from tqdm import tqdm
 
 def compute_tf_msve(v_tf: np.ndarray,
                     v_true: np.ndarray,
@@ -209,7 +210,9 @@ def run_hyperparam_search():
                   log_interval=250, save_dir='l{layer}_s{s_}_sw{samp_w}'.format(layer=l, s_=s, samp_w=sw))
 
 if __name__ == '__main__':
-    from plotter import process_log, plot_error_data
+    from plotter import (compute_weight_metrics, plot_error_data,
+                         plot_weight_metrics, process_log)
+    from utils import get_hardcoded_P, get_hardcoded_Q
     d = 4
     n = 100
     l = 4
@@ -217,15 +220,19 @@ if __name__ == '__main__':
     startTime = datetime.datetime.now()
     save_dir = os.path.join('./logs', "discounted_train", startTime.strftime("%Y-%m-%d-%H-%M-%S"))
     data_dirs = []
-    for seed in [1, 2]:
+    for seed in [1, 2, 3, 42, 100]:
         data_dir = os.path.join(save_dir, f'seed_{seed}')
         data_dirs.append(data_dir)
         train(d, s, n, l, lmbd=0.0,  mode='sequential',
-              n_mdps=60, log_interval=20, random_seed=seed, save_dir=data_dir,)
+              n_mdps=1000, log_interval=10, random_seed=seed, save_dir=data_dir,)
         log, _ = load_data(data_dir)
         xs, error_log, attn_params = process_log(log)
         plot_error_data(xs, error_log, save_dir=data_dir)
         plot_attention_params(xs, attn_params, save_dir=data_dir)
+        P_true = get_hardcoded_P(d)
+        Q_true = get_hardcoded_Q(d)
+        P_metrics, Q_metrics = compute_weight_metrics(attn_params, P_true, Q_true, d)
+        plot_weight_metrics(xs, l, P_metrics, Q_metrics, data_dir)
     plot_multiple_runs(data_dirs, save_dir=save_dir)
 
 
