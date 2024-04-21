@@ -1,20 +1,19 @@
 import datetime
 import json
 import os
-import pickle
 
 import numpy as np
 import torch
 import torch.optim as optim
+from tqdm import tqdm
 
 from experiment.loss import weight_error_norm
 from experiment.model import LinearTransformer
+from experiment.plotter import (load_data, plot_attention_params,
+                                plot_multiple_runs)
 from experiment.prompt import MDPPromptGenerator
-from experiment.utils import (compute_msve, solve_mspbe_weight,
-                              solve_msve_weight, set_seed)
-
-from experiment.plotter import plot_data, plot_multiple_runs, print_final_weights
-from tqdm import tqdm
+from experiment.utils import (compute_msve, set_seed, solve_mspbe_weight,
+                              solve_msve_weight)
 
 def compute_tf_msve(v_tf: np.ndarray,
                     v_true: np.ndarray,
@@ -163,11 +162,11 @@ def train(d: int,
             log['transformer mspbe'].append(tf_mspbe)
 
             if mode=='auto':
-                log['P'].append(np.expand_dims(tf.attn.P.detach().numpy(), axis=0))
-                log['Q'].append(np.expand_dims(tf.attn.Q.detach().numpy(), axis=0))
+                log['P'].append([tf.attn.P.detach().numpy().copy()])
+                log['Q'].append([tf.attn.Q.detach().numpy().copy()])
             else:
-                log['P'].append(np.stack([layer.P.detach().numpy() for layer in tf.layers]))
-                log['Q'].append(np.stack([layer.Q.detach().numpy() for layer in tf.layers]))
+                log['P'].append(np.stack([layer.P.detach().numpy().copy() for layer in tf.layers]))
+                log['Q'].append(np.stack([layer.Q.detach().numpy().copy() for layer in tf.layers]))
 
     _save_log(log, save_dir)
 
@@ -180,6 +179,7 @@ def train(d: int,
         'gamma': gamma,
         'sample_weight': sample_weight,
         'manual': manual,
+        'mode': mode,
         'n_mdps': n_mdps,
         'mini_batch_size': mini_batch_size,
         'n_batch_per_mdp': n_batch_per_mdp,
@@ -192,9 +192,6 @@ def train(d: int,
     # Save hyperparameters as JSON
     with open(os.path.join(save_dir, 'params.json'), 'w') as f:
         json.dump(hyperparameters, f)
-
-    # plot_data(log, save_dir)
-    print_final_weights(tf, save_dir)
 
 
 def run_hyperparam_search():
@@ -212,17 +209,29 @@ def run_hyperparam_search():
                   log_interval=250, save_dir='l{layer}_s{s_}_sw{samp_w}'.format(layer=l, s_=s, samp_w=sw))
 
 if __name__ == '__main__':
-    d = 4
+    from plotter import (compute_weight_metrics, plot_error_data,
+                         plot_weight_metrics, process_log)
+    from utils import get_hardcoded_P, get_hardcoded_Q
+    d = 5
     n = 100
     l = 4
     s = int(n/10)
+    mode = 'sequential'
     startTime = datetime.datetime.now()
     save_dir = os.path.join('./logs', "discounted_train", startTime.strftime("%Y-%m-%d-%H-%M-%S"))
-    for seed in [1, 2, 3]:
-        train(d, s, n, l, lmbd=0.0,  n_mdps=60, log_interval=25, random_seed=seed, save_dir= os.path.join(save_dir, f'seed_{seed}'), mode='sequential')
-    # with np.load('./logs/discounted_train/2024-04-19-20-09-57/seed_1/discounted_train.npz') as data:
-    #     for key, value in data.items():
-    #         print(key, value.shape)
-    
-
-
+    data_dirs = []
+    for seed in [1, 2, 3, 42, 100]:
+        data_dir = os.path.join(save_dir, f'seed_{seed}')
+        data_dirs.append(data_dir)
+        train(d, s, n, l, lmbd=0.0, mode=mode,
+              n_mdps=5000, log_interval=10, random_seed=seed, save_dir=data_dir,)
+        log, _ = load_data(data_dir)
+        xs, error_log, attn_params = process_log(log)
+        plot_error_data(xs, error_log, save_dir=data_dir)
+        plot_attention_params(xs, attn_params, save_dir=data_dir)
+        P_true = get_hardcoded_P(d)
+        Q_true = get_hardcoded_Q(d)
+        P_metrics, Q_metrics = compute_weight_metrics(attn_params, P_true, Q_true, d)
+        l_tf = l if mode == 'sequential' else 1
+        plot_weight_metrics(xs, l_tf, P_metrics, Q_metrics, data_dir)
+    plot_multiple_runs(data_dirs, save_dir=save_dir)

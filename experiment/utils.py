@@ -11,11 +11,13 @@ def stack_four(A: torch.Tensor, B: torch.Tensor,
     bottom = torch.cat([C, D], dim=1)
     return torch.cat([top, bottom], dim=0)
 
+
 def stack_four_np(A: np.ndarray, B: np.ndarray,
-                    C: np.ndarray, D: np.ndarray):
+                  C: np.ndarray, D: np.ndarray):
     top = np.concatenate([A, B], axis=1)
     bottom = np.concatenate([C, D], axis=1)
     return np.concatenate([top, bottom], axis=0)
+
 
 def analytical_weight_update(w_tf: torch.Tensor,
                              Z: torch.Tensor,
@@ -124,20 +126,44 @@ def compute_mspbe(w: np.ndarray,
     mspbe = steady_dist.dot(pbe**2)
     return mspbe.item()
 
+
 def set_seed(seed: int):
     torch.manual_seed(seed)
     np.random.seed(seed)
 
-def compare_P(P_tf: np.ndarray, P_true: np.ndarray,d: int):
+
+def get_hardcoded_P(d: int):
+    '''
+    d: feature dimension
+    '''
+    P = np.zeros((2*d+1, 2*d+1))
+    P[-1, -1] = 1
+    return P
+
+def get_hardcoded_Q(d: int):
+    '''
+    d: feature dimension
+    '''
+    I = np.eye(d)
+    O = np.zeros((d, d))
+    C = np.eye(d)  # just use the identity matrix as pre-conditioner
+    A = stack_four_np(-C.T, C.T, O, O)
+    Q = np.zeros((2*d+1, 2*d+1))
+    Q[:2*d, :2*d] = A
+    return Q
+
+def compare_P(P_tf: np.ndarray, P_true: np.ndarray, d: int):
     '''
     P_tf: P matrix from transformer
     P_true: hardcoded P matrix that implements TD
     '''
 
     norm_diff = np.linalg.norm(P_true - P_tf)
-    bottom_right = P_tf[-1,-1]
-    avg_abs_all_others = 1/((2*d+1)**2 - 1)*(np.sum(np.abs(P_tf)) - np.abs(P_tf[-1,-1]))
+    bottom_right = P_tf[-1, -1]
+    avg_abs_all_others = 1/((2*d+1)**2 - 1) * \
+        (np.sum(np.abs(P_tf)) - np.abs(P_tf[-1, -1]))
     return norm_diff, bottom_right, avg_abs_all_others
+
 
 def compare_Q(Q_tf: np.ndarray, Q_true: np.ndarray, d: int):
     '''
@@ -147,9 +173,10 @@ def compare_Q(Q_tf: np.ndarray, Q_true: np.ndarray, d: int):
     '''
     upper_left_block_trace = np.trace(Q_tf[:d, :d])
     upper_right_block_trace = np.trace(Q_tf[:d, d:2*d])
-    # average of absolute values of all other elements 
-    #(we have 2d+1 x 2d+1 matrix and we are excluding the diagonal entries of the two upper dxd blocks)
-    avg_abs_all_others = 1/((2*d+1)**2 - 2*d)*(np.sum(np.abs(Q_tf)) - upper_right_block_trace - upper_left_block_trace)
+    # average of absolute values of all other elements
+    # (we have 2d+1 x 2d+1 matrix and we are excluding the diagonal entries of the two upper dxd blocks)
+    avg_abs_all_others = 1/((2*d+1)**2 - 2*d)*(np.sum(np.abs(Q_tf)) -
+                                               upper_right_block_trace - upper_left_block_trace)
     norm_diff = np.linalg.norm(Q_true - Q_tf)
     return norm_diff, upper_left_block_trace, upper_right_block_trace, avg_abs_all_others
 
@@ -159,6 +186,7 @@ def check_params(params, params_0):
     for key in [k for k in params.keys() if k != 'random_seed']:
         if params[key] != params_0[key]:
             raise ValueError(f'Parameter {key} is not the same across runs.')
+
 
 if __name__ == '__main__':
     from MRP.boyan import BoyanChain
