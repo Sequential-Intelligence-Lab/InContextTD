@@ -13,7 +13,7 @@ from experiment.prompt import MDPPromptGenerator
 from experiment.utils import (compute_msve, solve_mspbe_weight,
                               solve_msve_weight, set_seed)
 
-from experiment.plotter import plot_data, plot_multiple_runs, print_final_weights
+from experiment.plotter import plot_multiple_runs, plot_attention_params, load_data
 from tqdm import tqdm
 
 def compute_tf_msve(v_tf: np.ndarray,
@@ -193,9 +193,6 @@ def train(d: int,
     with open(os.path.join(save_dir, 'params.json'), 'w') as f:
         json.dump(hyperparameters, f)
 
-    # plot_data(log, save_dir)
-    print_final_weights(tf, save_dir)
-
 
 def run_hyperparam_search():
     torch.manual_seed(2)
@@ -212,17 +209,25 @@ def run_hyperparam_search():
                   log_interval=250, save_dir='l{layer}_s{s_}_sw{samp_w}'.format(layer=l, s_=s, samp_w=sw))
 
 if __name__ == '__main__':
+    from plotter import process_log, plot_error_data
     d = 4
     n = 100
     l = 4
     s = int(n/10)
     startTime = datetime.datetime.now()
     save_dir = os.path.join('./logs', "discounted_train", startTime.strftime("%Y-%m-%d-%H-%M-%S"))
-    for seed in [1, 2, 3]:
-        train(d, s, n, l, lmbd=0.0,  n_mdps=60, log_interval=25, random_seed=seed, save_dir= os.path.join(save_dir, f'seed_{seed}'), mode='sequential')
-    # with np.load('./logs/discounted_train/2024-04-19-20-09-57/seed_1/discounted_train.npz') as data:
-    #     for key, value in data.items():
-    #         print(key, value.shape)
-    
+    data_dirs = []
+    for seed in [1, 2]:
+        data_dir = os.path.join(save_dir, f'seed_{seed}')
+        data_dirs.append(data_dir)
+        train(d, s, n, l, lmbd=0.0,  mode='sequential',
+              n_mdps=60, log_interval=20, random_seed=seed, save_dir=data_dir,)
+        log, _ = load_data(data_dir)
+        xs, error_log, attn_params = process_log(log)
+        plot_error_data(xs, error_log, save_dir=data_dir)
+        plot_attention_params(xs, attn_params, save_dir=data_dir)
+    plot_multiple_runs(data_dirs, save_dir=save_dir)
+
+
 
 
