@@ -213,19 +213,19 @@ if __name__ == '__main__':
     from plotter import (compute_weight_metrics, plot_error_data,
                          plot_weight_metrics, process_log)
     from utils import get_hardcoded_P, get_hardcoded_Q
-    d = 4
+    d = 5
     n = 100
-    l = 3
+    l = 4
     s = int(n/10)
-    mode = 'auto'
+    mode = 'sequential'
     startTime = datetime.datetime.now()
     save_dir = os.path.join('./logs', "discounted_train", startTime.strftime("%Y-%m-%d-%H-%M-%S"))
     data_dirs = []
-    for seed in [1, 2, 3]:
+    for seed in [1, 2, 3, 42, 100]:
         data_dir = os.path.join(save_dir, f'seed_{seed}')
         data_dirs.append(data_dir)
         train(d, s, n, l, lmbd=0.0, mode=mode,
-              n_mdps=1000, log_interval=10, random_seed=seed, save_dir=data_dir,)
+              n_mdps=5000, log_interval=10, random_seed=seed, save_dir=data_dir,)
         log, _ = load_data(data_dir)
         xs, error_log, attn_params = process_log(log)
         plot_error_data(xs, error_log, save_dir=data_dir)

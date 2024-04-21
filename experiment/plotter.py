@@ -100,6 +100,9 @@ def plot_error_data(xs: np.ndarray,
     error_log: dictionary containing the error data
     save_dir: directory to save the plots
     '''
+    error_dir = os.path.join(save_dir, 'error_metrics_plots')
+    if not os.path.exists(error_dir):
+        os.makedirs(error_dir)
 
     # MSTDE
     mean_mstde = np.mean(error_log['mstde'], axis=0)
@@ -112,7 +115,7 @@ def plot_error_data(xs: np.ndarray,
     plt.ylabel('Loss (MSTDE)')
     plt.title('Loss (MSTDE) vs # MDPs')
     plt.legend()
-    plt.savefig(os.path.join(save_dir, 'loss_mstde.png'), dpi=300)
+    plt.savefig(os.path.join(error_dir, 'loss_mstde.png'), dpi=300)
     plt.close()
 
     # Weight norm
@@ -137,7 +140,7 @@ def plot_error_data(xs: np.ndarray,
     plt.ylabel('Weight Error L2 Norm')
     plt.title('Weight Error Norm vs # MDPs')
     plt.legend()
-    plt.savefig(os.path.join(save_dir, 'weight_error_norm.png'), dpi=300)
+    plt.savefig(os.path.join(error_dir, 'weight_error_norm.png'), dpi=300)
     plt.close()
 
     # Value error
@@ -157,7 +160,7 @@ def plot_error_data(xs: np.ndarray,
     plt.ylabel('MSVE')
     plt.title('MSVE vs # MDPs')
     plt.legend()
-    plt.savefig(os.path.join(save_dir, 'msve.png'), dpi=300)
+    plt.savefig(os.path.join(error_dir, 'msve.png'), dpi=300)
     plt.close()
 
     # MSPBE
@@ -171,7 +174,7 @@ def plot_error_data(xs: np.ndarray,
     plt.ylabel('MSPBE')
     plt.title('MSPBE vs # MDPs')
     plt.legend()
-    plt.savefig(os.path.join(save_dir, 'mspbe.png'), dpi=300)
+    plt.savefig(os.path.join(error_dir, 'mspbe.png'), dpi=300)
     plt.close()
 
 
@@ -186,6 +189,10 @@ def plot_attention_params(xs: np.ndarray,
     save_dir: directory to save the plots
     log_step: time step to visualize
     '''
+    attn_dir = os.path.join(save_dir, 'attention_params_plots')
+    if not os.path.exists(attn_dir):
+        os.makedirs(attn_dir)
+
     Ps, Qs = params['P'], params['Q']  # both have shape (T, l, 2d+1, 2d+1)
     assert Ps.shape == Qs.shape
     ckpt = xs[log_step]
@@ -203,7 +210,7 @@ def plot_attention_params(xs: np.ndarray,
         axs[1].matshow(Q, vmin=-1, vmax=1)
         axs[1].set_title(f'Layer {l+1} Q Matrix at MDP {ckpt}')
         fig.colorbar(cax1, ax=axs, orientation='vertical')
-        plt.savefig(os.path.join(save_dir, f'PQ_{l+1}_{ckpt}.png'), dpi=300)
+        plt.savefig(os.path.join(attn_dir, f'PQ_{l+1}_{ckpt}.png'), dpi=300)
         plt.close(fig)
 
 
@@ -220,6 +227,13 @@ def plot_weight_metrics(xs: np.ndarray,
     Q_metrics: metrics for Q matrix
     save_dir: directory to save the plots
     '''
+    P_metrics_dir = os.path.join(save_dir, 'P_metrics_plots')
+    Q_metrics_dir = os.path.join(save_dir, 'Q_metrics_plots')
+    if not os.path.exists(P_metrics_dir):
+        os.makedirs(P_metrics_dir)
+    if not os.path.exists(Q_metrics_dir):
+        os.makedirs(Q_metrics_dir)
+
     # same layer, different metrics
     for i in range(l):
         plt.figure()
@@ -233,7 +247,7 @@ def plot_weight_metrics(xs: np.ndarray,
             plt.xlabel('# MDPs')
             plt.title(f'Transformer P Matrix Layer {i+1} Metrics')
             plt.legend()
-        plt.savefig(os.path.join(save_dir, f'P_metrics_{i+1}.png'), dpi=300)
+        plt.savefig(os.path.join(P_metrics_dir, f'P_metrics_{i+1}.png'), dpi=300)
         plt.close()
 
     # same metric, different layers
@@ -249,7 +263,7 @@ def plot_weight_metrics(xs: np.ndarray,
             plt.xlabel('# MDPs')
             plt.title(f'Transformer P Matrix {key.replace("_", " ").title()}')
             plt.legend()
-        plt.savefig(os.path.join(save_dir, f'P_{key}.png'), dpi=300)
+        plt.savefig(os.path.join(P_metrics_dir, f'P_{key}.png'), dpi=300)
         plt.close()
 
     # same layer, different metrics
@@ -265,7 +279,7 @@ def plot_weight_metrics(xs: np.ndarray,
             plt.xlabel('# MDPs')
             plt.title(f'Transformer Q Matrix Layer {i+1} Metrics')
             plt.legend()
-        plt.savefig(os.path.join(save_dir, f'Q_metrics_{i+1}.png'), dpi=300)
+        plt.savefig(os.path.join(Q_metrics_dir, f'Q_metrics_{i+1}.png'), dpi=300)
         plt.close()
 
     # same metric, different layers
@@ -281,7 +295,7 @@ def plot_weight_metrics(xs: np.ndarray,
             plt.xlabel('# MDPs')
             plt.title(f'Transformer Q Matrix {key.replace("_", " ").title()}')
             plt.legend()
-        plt.savefig(os.path.join(save_dir, f'Q_{key}.png'), dpi=300)
+        plt.savefig(os.path.join(Q_metrics_dir, f'Q_{key}.png'), dpi=300)
         plt.close()
 
 
