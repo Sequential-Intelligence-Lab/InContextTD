@@ -146,7 +146,8 @@ class MDPPrompt:
     def td_update(self,
                   w: torch.Tensor,
                   C: torch.Tensor = None,
-                  residual: bool = False):
+                  residual: bool = False,
+                  lr: float = 1):
         '''
         w: weight vector
         C: preconditioning matrix

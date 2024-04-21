@@ -214,6 +214,44 @@ def run_hyperparam_search():
             s = int(n/s_frac)
             train(d, s, n, l, lmbd=0.0, sample_weight=sw, epochs=25_000,
                   log_interval=250, save_dir='l{layer}_s{s_}_sw{samp_w}'.format(layer=l, s_=s, samp_w=sw))
+            
+# computes the cosine similarity between the tf forward pass and TD
+def compare_tf_td_weight( tf:LinearTransformer,  prompt: MDPPrompt):
+    '''
+    computes the cosine similarity between the transformer forward pass implicit weight and the TD update weight 
+    tf: an instance of LinearTransformer
+    prompt: an instance of MDPPrompt
+    '''
+    # transformer should perform l steps of TD
+    # extract the implicit weight from the transformer
+    implicit_w_tf = tf.manual_weight_extraction(prompt.context(), tf.d).detach().numpy()
+    w_td = torch.zeros((tf.d,1), requires_grad = False)
+    # unroll td for the same number of steps as the transformer
+    if tf.mode == 'auto':
+        # P and Q could differ from the hardcoded P and Q values by some constant learning rate
+        # We rescale the learning rate for td accordingly
+        C_p, C_q= rescale_lr(tf.attn.P.detach().numpy(), tf.attn.Q.detach().numpy())
+        for layer in range(tf.l):
+            w_td, v_td = prompt.td_update(w_td, lr = C_p*C_q)
+    else: # sequential
+        for l, layer in enumerate(tf.layers):
+            C_p, C_q = rescale_lr(layer.P.detach().numpy(), layer.Q.detach().numpy())
+            w_td, v_td = prompt.td_update(w_td, lr = C_p*C_q)
+    w_td = w_td.numpy()
+    cosine_similarity = w_td.T @ implicit_w_tf / (np.linalg.norm(w_td) * np.linalg.norm(implicit_w_tf)).item()
+    return cosine_similarity, np.linalg.norm(w_td-implicit_w_tf)
+
+def compare_tf_td_values(tf:LinearTransformer, prompt: MDPPrompt):
+    pass
+
+def rescale_lr(P: np.ndarray, Q: np.ndarray):
+    '''
+    P: the P matrix
+    Q: the Q matrix
+    '''
+    C_P = np.max(P)
+    C_Q = np.max(Q)
+    return C_P, C_Q
 
 if __name__ == '__main__':
     from plotter import (compute_weight_metrics, plot_error_data,
@@ -221,7 +259,7 @@ if __name__ == '__main__':
     from utils import get_hardcoded_P, get_hardcoded_Q
     d = 5
     n = 100
-    l = 4
+    l = 3
     s = int(n/10)
     mode = 'sequential'
     startTime = datetime.datetime.now()

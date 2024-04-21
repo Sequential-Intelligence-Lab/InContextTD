@@ -90,6 +90,8 @@ def plot_multiple_runs(data_dirs: List[str],
     batched_P_metrics = _batch_runs(P_metrics_lst)
     plot_weight_metrics(xs, l, batched_P_metrics, batched_Q_metrics, save_dir)
 
+def scale(matrix: np.ndarray):
+    return matrix / np.max(np.abs(matrix))
 
 def plot_error_data(xs: np.ndarray,
                     error_log: dict,
