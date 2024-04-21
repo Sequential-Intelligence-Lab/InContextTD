@@ -9,11 +9,11 @@ from experiment.utils import (check_params, compare_P, compare_Q,
                               get_hardcoded_P, get_hardcoded_Q)
 
 
+
 def load_data(data_dir: str) -> Tuple[dict, dict]:
     """
     Load data from specified directory and return the relevant metrics.
     """
-
     with np.load(os.path.join(data_dir, 'data.npz')) as data, \
             open(os.path.join(data_dir, 'params.json'), 'r') as params_file:
         log = {key: data[key] for key in data}
@@ -249,6 +249,7 @@ def plot_weight_metrics(xs: np.ndarray,
             plt.legend()
         plt.savefig(os.path.join(P_metrics_dir, f'P_metrics_{i+1}.png'), dpi=300)
         plt.close()
+
 
     # same metric, different layers
     for key, metric in P_metrics.items():

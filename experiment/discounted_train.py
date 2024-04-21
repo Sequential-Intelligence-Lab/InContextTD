@@ -15,7 +15,6 @@ from experiment.prompt import MDPPromptGenerator
 from experiment.utils import (compute_msve, set_seed, solve_mspbe_weight,
                               solve_msve_weight)
 
-
 def compute_tf_msve(v_tf: np.ndarray,
                     v_true: np.ndarray,
                     steady_d: np.ndarray) -> float:
@@ -236,7 +235,3 @@ if __name__ == '__main__':
         l_tf = l if mode == 'sequential' else 1
         plot_weight_metrics(xs, l_tf, P_metrics, Q_metrics, data_dir)
     plot_multiple_runs(data_dirs, save_dir=save_dir)
-
-
-
-
