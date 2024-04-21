@@ -1,7 +1,6 @@
 import datetime
 import json
 import os
-import pickle
 
 import numpy as np
 import torch
@@ -164,11 +163,11 @@ def train(d: int,
             log['transformer mspbe'].append(tf_mspbe)
 
             if mode=='auto':
-                log['P'].append(np.expand_dims(tf.attn.P.detach().numpy(), axis=0))
-                log['Q'].append(np.expand_dims(tf.attn.Q.detach().numpy(), axis=0))
+                log['P'].append([tf.attn.P.detach().numpy().copy()])
+                log['Q'].append([tf.attn.Q.detach().numpy().copy()])
             else:
-                log['P'].append(np.stack([layer.P.detach().numpy() for layer in tf.layers]))
-                log['Q'].append(np.stack([layer.Q.detach().numpy() for layer in tf.layers]))
+                log['P'].append(np.stack([layer.P.detach().numpy().copy() for layer in tf.layers]))
+                log['Q'].append(np.stack([layer.Q.detach().numpy().copy() for layer in tf.layers]))
 
     _save_log(log, save_dir)
 
@@ -181,6 +180,7 @@ def train(d: int,
         'gamma': gamma,
         'sample_weight': sample_weight,
         'manual': manual,
+        'mode': mode,
         'n_mdps': n_mdps,
         'mini_batch_size': mini_batch_size,
         'n_batch_per_mdp': n_batch_per_mdp,
@@ -215,15 +215,16 @@ if __name__ == '__main__':
     from utils import get_hardcoded_P, get_hardcoded_Q
     d = 4
     n = 100
-    l = 4
+    l = 3
     s = int(n/10)
+    mode = 'auto'
     startTime = datetime.datetime.now()
     save_dir = os.path.join('./logs', "discounted_train", startTime.strftime("%Y-%m-%d-%H-%M-%S"))
     data_dirs = []
-    for seed in [1, 2, 3, 42, 100]:
+    for seed in [1, 2, 3]:
         data_dir = os.path.join(save_dir, f'seed_{seed}')
         data_dirs.append(data_dir)
-        train(d, s, n, l, lmbd=0.0,  mode='sequential',
+        train(d, s, n, l, lmbd=0.0, mode=mode,
               n_mdps=1000, log_interval=10, random_seed=seed, save_dir=data_dir,)
         log, _ = load_data(data_dir)
         xs, error_log, attn_params = process_log(log)
@@ -232,7 +233,8 @@ if __name__ == '__main__':
         P_true = get_hardcoded_P(d)
         Q_true = get_hardcoded_Q(d)
         P_metrics, Q_metrics = compute_weight_metrics(attn_params, P_true, Q_true, d)
-        plot_weight_metrics(xs, l, P_metrics, Q_metrics, data_dir)
+        l_tf = l if mode == 'sequential' else 1
+        plot_weight_metrics(xs, l_tf, P_metrics, Q_metrics, data_dir)
     plot_multiple_runs(data_dirs, save_dir=save_dir)
 
 

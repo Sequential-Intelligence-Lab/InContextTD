@@ -71,7 +71,8 @@ def plot_multiple_runs(data_dirs: List[str],
     # Load data from directories
     for data_dir in data_dirs:
         log, params = load_data(data_dir)
-        d, l = params['d'], params['l']
+        d = params['d']
+        l = params['l'] if params['mode'] == 'sequential' else 1
         check_params(params, params_0)
         xs, error_log, attn_params = process_log(log)
         error_log_lst.append(error_log)

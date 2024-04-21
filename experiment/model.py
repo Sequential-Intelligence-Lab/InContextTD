@@ -54,6 +54,8 @@ class LinearTransformer(nn.Module):
             for attn in self.layers:
                 nn.init.xavier_normal_(attn.P, gain=0.1/l)
                 nn.init.xavier_normal_(attn.Q, gain=0.1/l)
+        else:
+            raise ValueError('mode must be either auto or sequential')
 
     def forward(self, Z):
         '''
