@@ -11,7 +11,7 @@ from experiment.loss import weight_error_norm
 from experiment.model import LinearTransformer
 from experiment.plotter import (load_data, plot_attention_params,
                                 plot_multiple_runs)
-from experiment.prompt import MDPPromptGenerator
+from experiment.prompt import MDPPromptGenerator, MDPPrompt
 from experiment.utils import (compute_msve, set_seed, solve_mspbe_weight,
                               solve_msve_weight)
 
@@ -48,7 +48,7 @@ def _init_log() -> dict:
            'P': [],
            'Q': [],
            'implicit w_tf and w_td cos sim': [],
-           'w_tf_w_td_diff_l2': []
+           'w_tf w_td diff l2': []
            }
     return log
 
@@ -165,7 +165,7 @@ def train(d: int,
 
             w_tf_w_td_cos_sim, w_tf_w_td_diff_l2= compare_tf_td_weight(tf, prompt)
             log['implicit w_tf and w_td cos sim'].append(w_tf_w_td_cos_sim)
-            log['w_tf_w_td_diff_l2'].append(w_tf_w_td_diff_l2)
+            log['w_tf w_td diff l2'].append(w_tf_w_td_diff_l2)
 
             if mode=='auto':
                 log['P'].append([tf.attn.P.detach().numpy().copy()])
@@ -185,7 +185,6 @@ def train(d: int,
         'gamma': gamma,
         'sample_weight': sample_weight,
         'manual': manual,
-        'mode': mode,
         'n_mdps': n_mdps,
         'mini_batch_size': mini_batch_size,
         'n_batch_per_mdp': n_batch_per_mdp,
@@ -238,8 +237,8 @@ def compare_tf_td_weight( tf:LinearTransformer,  prompt: MDPPrompt):
             C_p, C_q = rescale_lr(layer.P.detach().numpy(), layer.Q.detach().numpy())
             w_td, v_td = prompt.td_update(w_td, lr = C_p*C_q)
     w_td = w_td.numpy()
-    cosine_similarity = w_td.T @ implicit_w_tf / (np.linalg.norm(w_td) * np.linalg.norm(implicit_w_tf)).item()
-    return cosine_similarity, np.linalg.norm(w_td-implicit_w_tf)
+    cosine_similarity = w_td.T @ implicit_w_tf / (np.linalg.norm(w_td) * np.linalg.norm(implicit_w_tf))
+    return cosine_similarity.item(), np.linalg.norm(w_td-implicit_w_tf)
 
 def compare_tf_td_values(tf:LinearTransformer, prompt: MDPPrompt):
     pass
@@ -258,10 +257,10 @@ if __name__ == '__main__':
                          plot_weight_metrics, process_log)
     from utils import get_hardcoded_P, get_hardcoded_Q
     d = 5
-    n = 100
+    n = 150
     l = 3
     s = int(n/10)
-    mode = 'sequential'
+    mode = 'auto'
     startTime = datetime.datetime.now()
     save_dir = os.path.join('./logs', "discounted_train", startTime.strftime("%Y-%m-%d-%H-%M-%S"))
     data_dirs = []

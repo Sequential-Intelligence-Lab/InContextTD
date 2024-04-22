@@ -18,6 +18,8 @@ def stack_four_np(A: np.ndarray, B: np.ndarray,
     bottom = np.concatenate([C, D], axis=1)
     return np.concatenate([top, bottom], axis=0)
 
+def scale(matrix: np.ndarray):
+    return matrix / np.max(np.abs(matrix))
 
 def analytical_weight_update(w_tf: torch.Tensor,
                              Z: torch.Tensor,
@@ -158,7 +160,7 @@ def compare_P(P_tf: np.ndarray, P_true: np.ndarray, d: int):
     P_true: hardcoded P matrix that implements TD
     '''
 
-    norm_diff = np.linalg.norm(P_true - P_tf)
+    norm_diff = np.linalg.norm(P_true - scale(P_tf))
     bottom_right = P_tf[-1, -1]
     avg_abs_all_others = 1/((2*d+1)**2 - 1) * \
         (np.sum(np.abs(P_tf)) - np.abs(P_tf[-1, -1]))
@@ -177,7 +179,7 @@ def compare_Q(Q_tf: np.ndarray, Q_true: np.ndarray, d: int):
     # (we have 2d+1 x 2d+1 matrix and we are excluding the diagonal entries of the two upper dxd blocks)
     avg_abs_all_others = 1/((2*d+1)**2 - 2*d)*(np.sum(np.abs(Q_tf)) -
                                                upper_right_block_trace - upper_left_block_trace)
-    norm_diff = np.linalg.norm(Q_true - Q_tf)
+    norm_diff = np.linalg.norm(Q_true - scale(Q_tf))
     return norm_diff, upper_left_block_trace, upper_right_block_trace, avg_abs_all_others
 
 
