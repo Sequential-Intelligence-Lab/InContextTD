@@ -216,7 +216,7 @@ if __name__ == '__main__':
     n = 100
     l = 4
     s = int(n/10)
-    mode = 'sequential'
+    mode = 'auto'
     startTime = datetime.datetime.now()
     save_dir = os.path.join('./logs', "discounted_train", startTime.strftime("%Y-%m-%d-%H-%M-%S"))
     data_dirs = []
