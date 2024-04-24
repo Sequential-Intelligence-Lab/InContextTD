@@ -43,7 +43,7 @@ class BoyanChain(MRP):
             self.v = X.dot(self.w)
             self.r = (np.eye(n_states) - gamma * self.P).dot(self.v)
         else:
-            self.r = np.random.uniform(low=0.01, high=0.99, size=(n_states, 1))
+            self.r = np.random.uniform(low=-1.0, high=1.0, size=(n_states, 1))
             self.v = np.linalg.inv(
                 np.eye(n_states) - gamma * self.P).dot(self.r)
 
