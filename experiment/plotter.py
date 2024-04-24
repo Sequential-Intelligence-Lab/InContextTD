@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from experiment.utils import (check_params, compare_P, compare_Q,
-                              get_hardcoded_P, get_hardcoded_Q)
+                              get_hardcoded_P, get_hardcoded_Q, scale)
 
 
 
@@ -37,7 +37,9 @@ def process_log(log: dict) -> Tuple[np.ndarray, dict, dict]:
                 'mspbe weight error norm',
                 'true msve',
                 'transformer msve',
-                'transformer mspbe'):
+                'transformer mspbe',
+                'implicit w_tf and w_td cos sim',
+                'w_tf w_td diff l2'):
         error_log[key] = np.expand_dims(log[key], axis=0)
 
     return log['xs'], error_log, attn_params
@@ -89,7 +91,6 @@ def plot_multiple_runs(data_dirs: List[str],
     batched_Q_metrics = _batch_runs(Q_metrics_lst)
     batched_P_metrics = _batch_runs(P_metrics_lst)
     plot_weight_metrics(xs, l, batched_P_metrics, batched_Q_metrics, save_dir)
-
 
 def plot_error_data(xs: np.ndarray,
                     error_log: dict,
@@ -177,6 +178,26 @@ def plot_error_data(xs: np.ndarray,
     plt.savefig(os.path.join(error_dir, 'mspbe.png'), dpi=300)
     plt.close()
 
+    # TF weight and TD weight comparison
+    mean_cos_sim = np.mean(error_log['implicit w_tf and w_td cos sim'], axis=0)
+    std_cos_sim = np.std(error_log['implicit w_tf and w_td cos sim'], axis=0)
+    mean_weight_diff = np.mean(error_log['w_tf w_td diff l2'], axis=0)
+    std_weight_diff = np.std(error_log['w_tf w_td diff l2'], axis=0)
+    plt.figure()
+    plt.plot(xs, mean_cos_sim, label='Cosine Similarity')
+    plt.fill_between(xs, mean_cos_sim - std_cos_sim,
+                     mean_cos_sim + std_cos_sim, alpha=0.2)
+    plt.plot(xs, mean_weight_diff, label='L2 Norm Weight Difference')
+    plt.fill_between(xs, mean_weight_diff - std_weight_diff,
+                     mean_weight_diff + std_weight_diff, alpha=0.2)
+    plt.fill_between(xs, mean_cos_sim - std_cos_sim,
+                     mean_cos_sim + std_cos_sim, alpha=0.2)
+    plt.xlabel('# MDPs')
+    plt.title('Transformer Implicit weight and l-step TD weight Cosine Similarity')
+    plt.legend()
+    plt.savefig(os.path.join(error_dir, 'tf_td_weight_comparison.png'), dpi=300)
+    plt.close()
+
 
 def plot_attention_params(xs: np.ndarray,
                           params: dict,
@@ -197,9 +218,6 @@ def plot_attention_params(xs: np.ndarray,
     assert Ps.shape == Qs.shape
     ckpt = xs[log_step]
     P_mats, Q_mats = Ps[log_step], Qs[log_step]
-
-    def scale(matrix: np.ndarray):
-        return matrix / np.max(np.abs(matrix))
 
     for l, (P, Q) in enumerate(zip(P_mats, Q_mats)):
         P = scale(P)
@@ -373,7 +391,7 @@ def compute_weight_metrics(attn_params: dict,
 
 if __name__ == '__main__':
     runs_directory = os.path.join(
-        './logs', 'discounted_train', '2024-04-18-21-07-30')
+        './logs', 'discounted_train', '2024-04-20-17-31-58')
     runs_to_plot = [run for run in os.listdir(
         runs_directory) if run.startswith('seed')]
     plot_multiple_runs([os.path.join(runs_directory, run)

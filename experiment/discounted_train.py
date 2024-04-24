@@ -11,7 +11,7 @@ from experiment.loss import weight_error_norm
 from experiment.model import LinearTransformer
 from experiment.plotter import (load_data, plot_attention_params,
                                 plot_multiple_runs)
-from experiment.prompt import MDPPromptGenerator
+from experiment.prompt import MDPPromptGenerator, MDPPrompt
 from experiment.utils import (compute_msve, set_seed, solve_mspbe_weight,
                               solve_msve_weight)
 
@@ -46,7 +46,9 @@ def _init_log() -> dict:
            'transformer msve': [],
            'transformer mspbe': [],
            'P': [],
-           'Q': []
+           'Q': [],
+           'implicit w_tf and w_td cos sim': [],
+           'w_tf w_td diff l2': []
            }
     return log
 
@@ -161,6 +163,10 @@ def train(d: int,
                 v_tf, phi, mdp.P, mdp.r, gamma, mdp.steady_d)
             log['transformer mspbe'].append(tf_mspbe)
 
+            w_tf_w_td_cos_sim, w_tf_w_td_diff_l2= compare_tf_td_weight(tf, prompt)
+            log['implicit w_tf and w_td cos sim'].append(w_tf_w_td_cos_sim)
+            log['w_tf w_td diff l2'].append(w_tf_w_td_diff_l2)
+
             if mode=='auto':
                 log['P'].append([tf.attn.P.detach().numpy().copy()])
                 log['Q'].append([tf.attn.Q.detach().numpy().copy()])
@@ -179,7 +185,6 @@ def train(d: int,
         'gamma': gamma,
         'sample_weight': sample_weight,
         'manual': manual,
-        'mode': mode,
         'n_mdps': n_mdps,
         'mini_batch_size': mini_batch_size,
         'n_batch_per_mdp': n_batch_per_mdp,
@@ -187,6 +192,7 @@ def train(d: int,
         'weight_decay': weight_decay,
         'log_interval': log_interval,
         'random_seed': random_seed,
+        'mode': mode
     }
 
     # Save hyperparameters as JSON
@@ -207,14 +213,52 @@ def run_hyperparam_search():
             s = int(n/s_frac)
             train(d, s, n, l, lmbd=0.0, sample_weight=sw, epochs=25_000,
                   log_interval=250, save_dir='l{layer}_s{s_}_sw{samp_w}'.format(layer=l, s_=s, samp_w=sw))
+            
+# computes the cosine similarity between the tf forward pass and TD
+def compare_tf_td_weight( tf:LinearTransformer,  prompt: MDPPrompt):
+    '''
+    computes the cosine similarity between the transformer forward pass implicit weight and the TD update weight 
+    tf: an instance of LinearTransformer
+    prompt: an instance of MDPPrompt
+    '''
+    # transformer should perform l steps of TD
+    # extract the implicit weight from the transformer
+    implicit_w_tf = tf.manual_weight_extraction(prompt.context(), tf.d).detach().numpy()
+    w_td = torch.zeros((tf.d,1), requires_grad = False)
+    # unroll td for the same number of steps as the transformer
+    if tf.mode == 'auto':
+        # P and Q could differ from the hardcoded P and Q values by some constant learning rate
+        # We rescale the learning rate for td accordingly
+        C_p, C_q= rescale_lr(tf.attn.P.detach().numpy(), tf.attn.Q.detach().numpy())
+        for layer in range(tf.l):
+            w_td, v_td = prompt.td_update(w_td, lr = C_p*C_q)
+    else: # sequential
+        for l, layer in enumerate(tf.layers):
+            C_p, C_q = rescale_lr(layer.P.detach().numpy(), layer.Q.detach().numpy())
+            w_td, v_td = prompt.td_update(w_td, lr = C_p*C_q)
+    w_td = w_td.numpy()
+    cosine_similarity = w_td.T @ implicit_w_tf / (np.linalg.norm(w_td) * np.linalg.norm(implicit_w_tf))
+    return cosine_similarity.item(), np.linalg.norm(w_td-implicit_w_tf)
+
+def compare_tf_td_values(tf:LinearTransformer, prompt: MDPPrompt):
+    pass
+
+def rescale_lr(P: np.ndarray, Q: np.ndarray):
+    '''
+    P: the P matrix
+    Q: the Q matrix
+    '''
+    C_P = np.max(P)
+    C_Q = np.max(Q)
+    return C_P, C_Q
 
 if __name__ == '__main__':
     from plotter import (compute_weight_metrics, plot_error_data,
                          plot_weight_metrics, process_log)
     from utils import get_hardcoded_P, get_hardcoded_Q
     d = 5
-    n = 100
-    l = 4
+    n = 150
+    l = 3
     s = int(n/10)
     mode = 'auto'
     startTime = datetime.datetime.now()
