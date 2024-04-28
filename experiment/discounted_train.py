@@ -9,11 +9,12 @@ from tqdm import tqdm
 
 from experiment.loss import weight_error_norm
 from experiment.model import LinearTransformer
-from experiment.plotter import (load_data, plot_attention_params,
-                                plot_multiple_runs)
-from experiment.prompt import MDPPromptGenerator, MDPPrompt
+from experiment.plotter import (generate_attention_params_gif, load_data,
+                                plot_attention_params, plot_multiple_runs)
+from experiment.prompt import MDPPrompt, MDPPromptGenerator
 from experiment.utils import (compute_msve, set_seed, solve_mspbe_weight,
                               solve_msve_weight)
+
 
 def compute_tf_msve(v_tf: np.ndarray,
                     v_true: np.ndarray,
@@ -258,24 +259,25 @@ if __name__ == '__main__':
     from utils import get_hardcoded_P, get_hardcoded_Q
     d = 4
     n = 30
-    l = 1
+    l = 3
     s = 10
     mode = 'auto'
     startTime = datetime.datetime.now()
     save_dir = os.path.join('./logs', "discounted_train", startTime.strftime("%Y-%m-%d-%H-%M-%S"))
     data_dirs = []
-    for seed in [1, 2, 3, 42, 100]:
+    for seed in range(5):
         data_dir = os.path.join(save_dir, f'seed_{seed}')
         data_dirs.append(data_dir)
         train(d, s, n, l, lmbd=0.0, mode=mode,
               n_mdps=5000, log_interval=10, random_seed=seed, save_dir=data_dir,)
-        log, params = load_data(data_dir)
+        log, hyperparams = load_data(data_dir)
         xs, error_log, attn_params = process_log(log)
-        plot_error_data(xs, error_log, save_dir=data_dir, params=params)
-        plot_attention_params(xs, attn_params, save_dir=data_dir, params=params)
+        l_tf = l if mode == 'sequential' else 1
+        plot_error_data(xs, error_log, save_dir=data_dir, params=hyperparams)
+        plot_attention_params(xs, attn_params, save_dir=data_dir)
+        generate_attention_params_gif(xs, l_tf, attn_params, data_dir)
         P_true = get_hardcoded_P(d)
         Q_true = get_hardcoded_Q(d)
         P_metrics, Q_metrics = compute_weight_metrics(attn_params, P_true, Q_true, d)
-        l_tf = l if mode == 'sequential' else 1
-        plot_weight_metrics(xs, l_tf, P_metrics, Q_metrics, data_dir)
+        plot_weight_metrics(xs, l_tf, P_metrics, Q_metrics, data_dir, params=hyperparams)
     plot_multiple_runs(data_dirs, save_dir=save_dir)

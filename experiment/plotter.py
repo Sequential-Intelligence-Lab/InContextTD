@@ -2,10 +2,11 @@ import json
 import os
 from typing import List, Tuple
 
+import imageio
 import matplotlib.pyplot as plt
-import seaborn as sns
 import numpy as np
 import scienceplots
+import seaborn as sns
 
 from experiment.utils import (check_params, compare_P, compare_Q,
                               get_hardcoded_P, get_hardcoded_Q, scale)
@@ -179,7 +180,7 @@ def plot_error_data(xs: np.ndarray,
     plt.xlabel('# MDPs')
     plt.ylabel('MSPBE')
     plt.ylim(0)
-    plt.title(f'TF (mode={params['mode']} L={params['l']}) MSPBE')
+    plt.title(f"TF (mode={params['mode']} L={params['l']}) MSPBE")
     plt.legend()
     plt.savefig(os.path.join(error_dir, 'mspbe.png'), dpi=300)
     plt.close()
@@ -208,35 +209,68 @@ def plot_error_data(xs: np.ndarray,
 def plot_attention_params(xs: np.ndarray,
                           params: dict,
                           save_dir: str,
-                          log_step: int = -1) -> None:
+                          log_step: int = -1) -> List[str]:
     '''
     visualize the attention parameters at a specific time step
     xs: x-axis values
     params: attention parameters
     save_dir: directory to save the plots
     log_step: time step to visualize
+    return the paths to the saved plots
     '''
     attn_dir = os.path.join(save_dir, 'attention_params_plots')
     if not os.path.exists(attn_dir):
         os.makedirs(attn_dir)
 
-    Ps, Qs = params['P'], params['Q']  # both have shape (T, l, 2d+1, 2d+1)
-    assert Ps.shape == Qs.shape
-    ckpt = xs[log_step]
-    P_mats, Q_mats = Ps[log_step], Qs[log_step]
-
-    for l, (P, Q) in enumerate(zip(P_mats, Q_mats)):
+    P_mats, Q_mats = params['P'][log_step], params['Q'][log_step]  # both have shape (l, 2d+1, 2d+1)
+    step = xs[log_step]
+    assert P_mats.shape == Q_mats.shape
+    
+    paths = []
+    for l, (P, Q) in enumerate(zip(P_mats, Q_mats)): # shape (2d+1, 2d+1)
         P = scale(P)
         Q = scale(Q)
         fig, axs = plt.subplots(nrows=1, ncols=2, figsize=(10, 5), sharey=True)
         cax1 = axs[0].matshow(P, vmin=-1, vmax=1)
-        axs[0].set_title(f'Layer {l+1} P Matrix at MDP {ckpt}')
+        axs[0].set_title(f'Layer {l+1} P Matrix at MDP {step}')
         axs[1].matshow(Q, vmin=-1, vmax=1)
-        axs[1].set_title(f'Layer {l+1} Q Matrix at MDP {ckpt}')
+        axs[1].set_title(f'Layer {l+1} Q Matrix at MDP {step}')
         fig.colorbar(cax1, ax=axs, orientation='vertical')
-        plt.savefig(os.path.join(attn_dir, f'PQ_{l+1}_{ckpt}.png'), dpi=300)
+        axs[0].tick_params(axis='both', which='both', bottom=False, top=False, left=False, right=False)
+        axs[1].tick_params(axis='both', which='both', bottom=False, top=False, left=False, right=False)
+        save_path = os.path.join(attn_dir, f'PQ_{l+1}_{step}.png')
+        plt.savefig(save_path, dpi=300)
         plt.close(fig)
+        paths.append(save_path)
+    return paths
 
+
+def generate_attention_params_gif(xs: dict,
+                                  l: int,
+                                  params: dict,
+                                  save_dir: str) -> None:
+    '''
+    generate a gif of the attention parameters for each layer
+    xs: x-axis values
+    l: number of layers
+    params: attention parameters
+    save_dir: directory to save the gif
+    '''
+    gif_dir = os.path.join(save_dir, 'attention_params_gif')
+    if not os.path.exists(gif_dir):
+        os.makedirs(gif_dir)
+    
+    gif_list = [[] for _ in range(l)] # list of lists to store the images for each layer
+    for step in range(len(xs)):
+        paths = plot_attention_params(xs, params, gif_dir, step)
+        for i, path in enumerate(paths):
+            gif_list[i].append(imageio.imread(path))
+            os.remove(path)
+
+    for i, gif in enumerate(gif_list):
+        imageio.mimwrite(os.path.join(gif_dir, f'PQ_{i+1}.gif'), gif, fps=2)
+
+    os.rmdir(os.path.join(gif_dir, 'attention_params_plots')) # remove the empty directory containing the temporary images
 
 def plot_weight_metrics(xs: np.ndarray,
                         l: int,
@@ -290,7 +324,6 @@ def plot_weight_metrics(xs: np.ndarray,
             plt.legend(frameon=True,framealpha=0.8, fontsize='small').set_alpha(0.5)
         plt.savefig(os.path.join(P_metrics_dir, f'P_metrics_{i+1}.png'), dpi=300)
         plt.close()
-
 
     # same metric, different layers
     for key, metric in P_metrics.items():
