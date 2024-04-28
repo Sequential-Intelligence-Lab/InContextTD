@@ -256,10 +256,10 @@ if __name__ == '__main__':
     from plotter import (compute_weight_metrics, plot_error_data,
                          plot_weight_metrics, process_log)
     from utils import get_hardcoded_P, get_hardcoded_Q
-    d = 5
-    n = 150
-    l = 3
-    s = int(n/10)
+    d = 4
+    n = 30
+    l = 1
+    s = 10
     mode = 'auto'
     startTime = datetime.datetime.now()
     save_dir = os.path.join('./logs', "discounted_train", startTime.strftime("%Y-%m-%d-%H-%M-%S"))
@@ -269,10 +269,10 @@ if __name__ == '__main__':
         data_dirs.append(data_dir)
         train(d, s, n, l, lmbd=0.0, mode=mode,
               n_mdps=5000, log_interval=10, random_seed=seed, save_dir=data_dir,)
-        log, _ = load_data(data_dir)
+        log, params = load_data(data_dir)
         xs, error_log, attn_params = process_log(log)
-        plot_error_data(xs, error_log, save_dir=data_dir)
-        plot_attention_params(xs, attn_params, save_dir=data_dir)
+        plot_error_data(xs, error_log, save_dir=data_dir, params=params)
+        plot_attention_params(xs, attn_params, save_dir=data_dir, params=params)
         P_true = get_hardcoded_P(d)
         Q_true = get_hardcoded_Q(d)
         P_metrics, Q_metrics = compute_weight_metrics(attn_params, P_true, Q_true, d)
