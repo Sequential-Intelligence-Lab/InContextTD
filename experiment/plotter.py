@@ -2,14 +2,15 @@ import json
 import os
 from typing import List, Tuple
 
-import matplotlib.pyplot as plt
-import seaborn as sns
-import numpy as np
 import imageio
+import matplotlib.pyplot as plt
+import numpy as np
 import scienceplots
+import seaborn as sns
 
 from experiment.utils import (check_params, compare_P, compare_Q,
                               get_hardcoded_P, get_hardcoded_Q, scale)
+
 
 def load_data(data_dir: str) -> Tuple[dict, dict]:
     """
@@ -208,13 +209,14 @@ def plot_error_data(xs: np.ndarray,
 def plot_attention_params(xs: np.ndarray,
                           params: dict,
                           save_dir: str,
-                          log_step: int = -1) -> None:
+                          log_step: int = -1) -> List[str]:
     '''
     visualize the attention parameters at a specific time step
     xs: x-axis values
     params: attention parameters
     save_dir: directory to save the plots
     log_step: time step to visualize
+    return the paths to the saved plots
     '''
     attn_dir = os.path.join(save_dir, 'attention_params_plots')
     if not os.path.exists(attn_dir):
@@ -224,6 +226,7 @@ def plot_attention_params(xs: np.ndarray,
     step = xs[log_step]
     assert P_mats.shape == Q_mats.shape
     
+    paths = []
     for l, (P, Q) in enumerate(zip(P_mats, Q_mats)): # shape (2d+1, 2d+1)
         P = scale(P)
         Q = scale(Q)
@@ -235,23 +238,39 @@ def plot_attention_params(xs: np.ndarray,
         fig.colorbar(cax1, ax=axs, orientation='vertical')
         axs[0].tick_params(axis='both', which='both', bottom=False, top=False, left=False, right=False)
         axs[1].tick_params(axis='both', which='both', bottom=False, top=False, left=False, right=False)
-        plt.savefig(os.path.join(attn_dir, f'PQ_{l+1}_{step}.png'), dpi=300)
+        save_path = os.path.join(attn_dir, f'PQ_{l+1}_{step}.png')
+        plt.savefig(save_path, dpi=300)
         plt.close(fig)
+        paths.append(save_path)
+    return paths
 
 
 def generate_attention_params_gif(xs: dict,
                                   l: int,
+                                  params: dict,
                                   save_dir: str) -> None:
-    attn_dir = os.path.join(save_dir, 'attention_params_plots')
+    '''
+    generate a gif of the attention parameters for each layer
+    xs: x-axis values
+    l: number of layers
+    params: attention parameters
+    save_dir: directory to save the gif
+    '''
+    gif_dir = os.path.join(save_dir, 'attention_params_gif')
+    if not os.path.exists(gif_dir):
+        os.makedirs(gif_dir)
+    
+    gif_list = [[] for _ in range(l)] # list of lists to store the images for each layer
+    for step in range(len(xs)):
+        paths = plot_attention_params(xs, params, gif_dir, step)
+        for i, path in enumerate(paths):
+            gif_list[i].append(imageio.imread(path))
+            os.remove(path)
 
-    for i in range(l):
-        images = []
-        for step in xs:
-            plot_path = os.path.join(attn_dir, f'PQ_{i+1}_{step}.png')
-            images.append(imageio.imread(plot_path))
+    for i, gif in enumerate(gif_list):
+        imageio.mimwrite(os.path.join(gif_dir, f'PQ_{i+1}.gif'), gif, fps=2)
 
-        imageio.mimwrite(os.path.join(attn_dir, f'PQ_{i+1}.gif'), images, fps=2)
-
+    os.rmdir(os.path.join(gif_dir, 'attention_params_plots')) # remove the empty directory containing the temporary images
 
 def plot_weight_metrics(xs: np.ndarray,
                         l: int,

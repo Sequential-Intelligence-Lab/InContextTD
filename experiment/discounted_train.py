@@ -261,7 +261,7 @@ if __name__ == '__main__':
     n = 30
     l = 3
     s = 10
-    mode = 'sequential'
+    mode = 'auto'
     startTime = datetime.datetime.now()
     save_dir = os.path.join('./logs', "discounted_train", startTime.strftime("%Y-%m-%d-%H-%M-%S"))
     data_dirs = []
@@ -269,15 +269,15 @@ if __name__ == '__main__':
         data_dir = os.path.join(save_dir, f'seed_{seed}')
         data_dirs.append(data_dir)
         train(d, s, n, l, lmbd=0.0, mode=mode,
-              n_mdps=5000, log_interval=25, random_seed=seed, save_dir=data_dir,)
+              n_mdps=1000, log_interval=10, random_seed=seed, save_dir=data_dir,)
         log, hyperparams = load_data(data_dir)
         xs, error_log, attn_params = process_log(log)
         l_tf = l if mode == 'sequential' else 1
-        plot_error_data(xs, error_log, save_dir=data_dir)
+        plot_error_data(xs, error_log, save_dir=data_dir, params=hyperparams)
         plot_attention_params(xs, attn_params, save_dir=data_dir)
-        generate_attention_params_gif(xs, l_tf, data_dir)
+        generate_attention_params_gif(xs, l_tf, attn_params, data_dir)
         P_true = get_hardcoded_P(d)
         Q_true = get_hardcoded_Q(d)
         P_metrics, Q_metrics = compute_weight_metrics(attn_params, P_true, Q_true, d)
-        plot_weight_metrics(xs, l_tf, P_metrics, Q_metrics, data_dir)
+        plot_weight_metrics(xs, l_tf, P_metrics, Q_metrics, data_dir, params=hyperparams)
     plot_multiple_runs(data_dirs, save_dir=save_dir)
