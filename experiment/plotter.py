@@ -3,11 +3,12 @@ import os
 from typing import List, Tuple
 
 import matplotlib.pyplot as plt
+import seaborn as sns
 import numpy as np
+import scienceplots
 
 from experiment.utils import (check_params, compare_P, compare_Q,
                               get_hardcoded_P, get_hardcoded_Q, scale)
-
 
 
 def load_data(data_dir: str) -> Tuple[dict, dict]:
@@ -70,6 +71,7 @@ def plot_multiple_runs(data_dirs: List[str],
     error_log_lst = []
     P_metrics_lst = []
     Q_metrics_lst = []
+    auto = True
     # Load data from directories
     for data_dir in data_dirs:
         log, params = load_data(data_dir)
@@ -86,15 +88,16 @@ def plot_multiple_runs(data_dirs: List[str],
         Q_metrics_lst.append(Q_metrics)
 
     batched_error_log = _batch_runs(error_log_lst)
-    plot_error_data(xs, batched_error_log, save_dir)
+    plot_error_data(xs, batched_error_log, save_dir, params)
 
     batched_Q_metrics = _batch_runs(Q_metrics_lst)
     batched_P_metrics = _batch_runs(P_metrics_lst)
-    plot_weight_metrics(xs, l, batched_P_metrics, batched_Q_metrics, save_dir)
+    plot_weight_metrics(xs, l, batched_P_metrics, batched_Q_metrics, save_dir, params)
 
 def plot_error_data(xs: np.ndarray,
                     error_log: dict,
-                    save_dir: str) -> None:
+                    save_dir: str,
+                    params: dict) -> None:
     '''
     plot the error data from validation
     xs: x-axis values
@@ -104,6 +107,8 @@ def plot_error_data(xs: np.ndarray,
     error_dir = os.path.join(save_dir, 'error_metrics_plots')
     if not os.path.exists(error_dir):
         os.makedirs(error_dir)
+
+    plt.style.use(['science', 'no-latex'])
 
     # MSTDE
     mean_mstde = np.mean(error_log['mstde'], axis=0)
@@ -168,12 +173,13 @@ def plot_error_data(xs: np.ndarray,
     mean_tf_mspbe = np.mean(error_log['transformer mspbe'], axis=0)
     std_tf_mspbe = np.std(error_log['transformer mspbe'], axis=0)
     plt.figure()
-    plt.plot(xs, mean_tf_mspbe, label='Transformer MSPBE')
+    plt.plot(xs, mean_tf_mspbe, label='TF')
     plt.fill_between(xs, mean_tf_mspbe - std_tf_mspbe,
                      mean_tf_mspbe + std_tf_mspbe, alpha=0.2)
     plt.xlabel('# MDPs')
     plt.ylabel('MSPBE')
-    plt.title('MSPBE vs # MDPs')
+    plt.ylim(0)
+    plt.title(f'TF (mode={params['mode']} L={params['l']}) MSPBE')
     plt.legend()
     plt.savefig(os.path.join(error_dir, 'mspbe.png'), dpi=300)
     plt.close()
@@ -236,7 +242,8 @@ def plot_weight_metrics(xs: np.ndarray,
                         l: int,
                         P_metrics: dict,
                         Q_metrics: dict,
-                        save_dir: str) -> None:
+                        save_dir: str,
+                        params: dict) -> None:
     '''
     plot the metrics for P and Q
     xs: x-axis values
@@ -252,19 +259,35 @@ def plot_weight_metrics(xs: np.ndarray,
     if not os.path.exists(Q_metrics_dir):
         os.makedirs(Q_metrics_dir)
 
+    plt.style.use(['science', 'ieee', 'no-latex'])
     # same layer, different metrics
     for i in range(l):
         plt.figure()
         for key, metric in P_metrics.items():
+            if params['mode'] == 'sequential': # if sequential, add layer number to the label and title
+                plt.title(f'TF (mode={params["mode"]}, L={params["l"]}) $P_{i}$ Metrics')
+                if key == 'norm_diff':
+                    label = (r'$||P^{TF}_{%s} - P^{TD}||_2$' %(str(i))) 
+                elif key == 'bottom_right':
+                    label = (r'$P^{TF}_{%s}[-1, -1]$' %(str(i)))
+                elif key == 'avg_abs_all_others':
+                    label = 'Avg Abs Others'
+            else:
+                plt.title(f'TF (mode={params["mode"]}, L={params["l"]}) $P$ Metrics')
+                if key == 'norm_diff':
+                    label = (r'$||P^{TF} - P^{TD}||_2$')
+                elif key == 'bottom_right':
+                    label = (r'$P^{TF}[-1, -1]$')
+                elif key == 'avg_abs_all_others':
+                    label = 'Avg Abs Others'
             mean_metric = np.mean(metric, axis=0)  # shape (T, l)
             std_metric = np.std(metric, axis=0)
             assert mean_metric.shape == std_metric.shape
-            plt.plot(xs, mean_metric[:, i], label=key.replace('_', ' '))
+            plt.plot(xs, mean_metric[:, i], label=label)
             plt.fill_between(xs, mean_metric[:, i] - std_metric[:, i],
                              mean_metric[:, i] + std_metric[:, i], alpha=0.2)
             plt.xlabel('# MDPs')
-            plt.title(f'Transformer P Matrix Layer {i+1} Metrics')
-            plt.legend()
+            plt.legend(frameon=True,framealpha=0.8, fontsize='small').set_alpha(0.5)
         plt.savefig(os.path.join(P_metrics_dir, f'P_metrics_{i+1}.png'), dpi=300)
         plt.close()
 
@@ -289,15 +312,34 @@ def plot_weight_metrics(xs: np.ndarray,
     for i in range(l):
         plt.figure()
         for key, metric in Q_metrics.items():
+            if params['mode'] == 'sequential': # if sequential, add layer number to the label and title
+                plt.title(f'TF (mode={params["mode"]}, L={params["l"]}) $Q_{i}$ Metrics')
+                if key == 'norm_diff':
+                    label = (r'$||Q^{TF}_{%s} - Q^{TD}||_2$' %(str(i))) 
+                elif key == 'upper_left_trace':
+                    label = (r'tr$(Q^{TF}_{%s}[:d, :d])$' %str(i))
+                elif key == 'upper_right_trace':
+                    label = (r'tr$(Q^{TF}_{%s}[:d, d:2d])$' %str(i))
+                elif key == 'avg_abs_all_others':
+                    label = 'Avg Abs Others'
+            else:
+                plt.title(f'TF (mode={params["mode"]}, L={params["l"]}) $Q$ Metrics')
+                if key == 'norm_diff':
+                    label = (r'$||Q^{TF} - Q^{TD}||_2$')
+                elif key == 'upper_left_trace':
+                    label = (r'tr$(Q^{TF}[:d, :d])$')
+                elif key == 'upper_right_trace':
+                    label = (r'tr$(Q^{TF}[:d, d:2d])$')
+                elif key == 'avg_abs_all_others':
+                    label = 'Avg Abs Others'
             mean_metric = np.mean(metric, axis=0)
             std_metric = np.std(metric, axis=0)
             assert mean_metric.shape == std_metric.shape
-            plt.plot(xs, mean_metric[:, i], label=key.replace('_', ' '))
+            plt.plot(xs, mean_metric[:, i], label=label)
             plt.fill_between(xs, mean_metric[:, i] - std_metric[:, i],
                              mean_metric[:, i] + std_metric[:, i], alpha=0.2)
             plt.xlabel('# MDPs')
-            plt.title(f'Transformer Q Matrix Layer {i+1} Metrics')
-            plt.legend()
+            plt.legend(frameon=True,framealpha=0.8, fontsize='small').set_alpha(0.5)
         plt.savefig(os.path.join(Q_metrics_dir, f'Q_metrics_{i+1}.png'), dpi=300)
         plt.close()
 
@@ -391,7 +433,7 @@ def compute_weight_metrics(attn_params: dict,
 
 if __name__ == '__main__':
     runs_directory = os.path.join(
-        './logs', 'discounted_train', '2024-04-20-17-31-58')
+        './logs', 'discounted_train', '2024-04-25-15-38-49')
     runs_to_plot = [run for run in os.listdir(
         runs_directory) if run.startswith('seed')]
     plot_multiple_runs([os.path.join(runs_directory, run)
