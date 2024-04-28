@@ -179,7 +179,7 @@ def plot_error_data(xs: np.ndarray,
     plt.xlabel('# MDPs')
     plt.ylabel('MSPBE')
     plt.ylim(0)
-    plt.title(f'TF (mode={params['mode']} L={params['l']}) MSPBE')
+    plt.title(f"TF (mode={params['mode']} L={params['l']}) MSPBE")
     plt.legend()
     plt.savefig(os.path.join(error_dir, 'mspbe.png'), dpi=300)
     plt.close()
@@ -220,25 +220,26 @@ def plot_attention_params(xs: np.ndarray,
     if not os.path.exists(attn_dir):
         os.makedirs(attn_dir)
 
-    Ps, Qs = params['P'], params['Q']  # both have shape (T, l, 2d+1, 2d+1)
-    assert Ps.shape == Qs.shape
+    P_mats, Q_mats = params['P'][log_step], params['Q'][log_step]  # both have shape (l, 2d+1, 2d+1)
+    step = xs[log_step]
+    assert P_mats.shape == Q_mats.shape
 
     def scale(matrix: np.ndarray):
         return matrix / np.max(np.abs(matrix))
-    for t, (P_mats, Q_mats) in enumerate(zip(Ps, Qs)):
-        for l, (P, Q) in enumerate(zip(P_mats, Q_mats)):
-            P = scale(P)
-            Q = scale(Q)
-            fig, axs = plt.subplots(
-                nrows=1, ncols=2, figsize=(10, 5), sharey=True)
-            cax1 = axs[0].matshow(P, vmin=-1, vmax=1)
-            axs[0].set_title(f'Layer {l+1} P Matrix at MDP {xs[t]}')
-            axs[1].matshow(Q, vmin=-1, vmax=1)
-            axs[1].set_title(f'Layer {l+1} Q Matrix at MDP {xs[t]}')
-            fig.colorbar(cax1, ax=axs, orientation='vertical')
-            plt.savefig(os.path.join(
-                attn_dir, f'PQ_{l+1}_{xs[t]}.png'), dpi=300)
-            plt.close(fig)
+    
+    for l, (P, Q) in enumerate(zip(P_mats, Q_mats)): # shape (2d+1, 2d+1)
+        P = scale(P)
+        Q = scale(Q)
+        fig, axs = plt.subplots(nrows=1, ncols=2, figsize=(10, 5), sharey=True)
+        cax1 = axs[0].matshow(P, vmin=-1, vmax=1)
+        axs[0].set_title(f'Layer {l+1} P Matrix at MDP {step}')
+        axs[1].matshow(Q, vmin=-1, vmax=1)
+        axs[1].set_title(f'Layer {l+1} Q Matrix at MDP {step}')
+        fig.colorbar(cax1, ax=axs, orientation='vertical')
+        axs[0].tick_params(axis='both', which='both', bottom=False, top=False, left=False, right=False)
+        axs[1].tick_params(axis='both', which='both', bottom=False, top=False, left=False, right=False)
+        plt.savefig(os.path.join(attn_dir, f'PQ_{l+1}_{step}.png'), dpi=300)
+        plt.close(fig)
 
 
 def generate_attention_params_gif(xs: dict,
