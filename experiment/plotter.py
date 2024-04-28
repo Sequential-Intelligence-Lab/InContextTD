@@ -223,9 +223,6 @@ def plot_attention_params(xs: np.ndarray,
     P_mats, Q_mats = params['P'][log_step], params['Q'][log_step]  # both have shape (l, 2d+1, 2d+1)
     step = xs[log_step]
     assert P_mats.shape == Q_mats.shape
-
-    def scale(matrix: np.ndarray):
-        return matrix / np.max(np.abs(matrix))
     
     for l, (P, Q) in enumerate(zip(P_mats, Q_mats)): # shape (2d+1, 2d+1)
         P = scale(P)
