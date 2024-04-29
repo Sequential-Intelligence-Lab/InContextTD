@@ -13,7 +13,7 @@ from experiment.plotter import (generate_attention_params_gif, load_data,
                                 plot_attention_params, plot_multiple_runs)
 from experiment.prompt import MDPPrompt, MDPPromptGenerator
 from experiment.utils import (compute_msve, set_seed, solve_mspbe_weight,
-                              solve_msve_weight)
+                              solve_msve_weight, in_context_learning_rate)
 
 
 def compute_tf_msve(v_tf: np.ndarray,
@@ -225,57 +225,48 @@ def compare_tf_td_weight( tf:LinearTransformer,  prompt: MDPPrompt):
     # transformer should perform l steps of TD
     # extract the implicit weight from the transformer
     implicit_w_tf = tf.manual_weight_extraction(prompt.context(), tf.d).detach().numpy()
-    w_td = torch.zeros((tf.d,1), requires_grad = False)
+    w_td = torch.zeros((tf.d, 1))
     # unroll td for the same number of steps as the transformer
     if tf.mode == 'auto':
         # P and Q could differ from the hardcoded P and Q values by some constant learning rate
         # We rescale the learning rate for td accordingly
-        C_p, C_q= rescale_lr(tf.attn.P.detach().numpy(), tf.attn.Q.detach().numpy())
+        lr = in_context_learning_rate(tf.attn.P.detach().numpy(), tf.attn.Q.detach().numpy(), tf.d)
         for layer in range(tf.l):
-            w_td, v_td = prompt.td_update(w_td, lr = C_p*C_q)
+            w_td, _ = prompt.td_update(w_td, lr = lr)
     else: # sequential
-        for l, layer in enumerate(tf.layers):
-            C_p, C_q = rescale_lr(layer.P.detach().numpy(), layer.Q.detach().numpy())
-            w_td, v_td = prompt.td_update(w_td, lr = C_p*C_q)
+        for layer in tf.layers:
+            lr = in_context_learning_rate(layer.P.detach().numpy(), layer.Q.detach().numpy(), tf.d)
+            w_td, _ = prompt.td_update(w_td, lr = lr)
     w_td = w_td.numpy()
     cosine_similarity = w_td.T @ implicit_w_tf / (np.linalg.norm(w_td) * np.linalg.norm(implicit_w_tf))
     return cosine_similarity.item(), np.linalg.norm(w_td-implicit_w_tf)
-
-def compare_tf_td_values(tf:LinearTransformer, prompt: MDPPrompt):
-    pass
-
-def rescale_lr(P: np.ndarray, Q: np.ndarray):
-    '''
-    P: the P matrix
-    Q: the Q matrix
-    '''
-    C_P = np.max(P)
-    C_Q = np.max(Q)
-    return C_P, C_Q
 
 if __name__ == '__main__':
     from plotter import (compute_weight_metrics, plot_error_data,
                          plot_weight_metrics, process_log)
     from utils import get_hardcoded_P, get_hardcoded_Q
     d = 4
-    n = 30
+    n = 50
     l = 3
     s = 10
-    mode = 'auto'
+    gamma = 0.9
+    mode = 'sequential'
     startTime = datetime.datetime.now()
     save_dir = os.path.join('./logs', "discounted_train", startTime.strftime("%Y-%m-%d-%H-%M-%S"))
     data_dirs = []
-    for seed in range(5):
+    for seed in [38, 42, 51, 100]:
         data_dir = os.path.join(save_dir, f'seed_{seed}')
         data_dirs.append(data_dir)
         train(d, s, n, l, lmbd=0.0, mode=mode,
-              n_mdps=1000, log_interval=10, random_seed=seed, save_dir=data_dir,)
+              n_mdps=2_000, log_interval=10, 
+              random_seed=seed, save_dir=data_dir,
+              gamma=gamma)
         log, hyperparams = load_data(data_dir)
         xs, error_log, attn_params = process_log(log)
         l_tf = l if mode == 'sequential' else 1
         plot_error_data(xs, error_log, save_dir=data_dir, params=hyperparams)
         plot_attention_params(xs, attn_params, save_dir=data_dir)
-        generate_attention_params_gif(xs, l_tf, attn_params, data_dir)
+        # generate_attention_params_gif(xs, l_tf, attn_params, data_dir)
         P_true = get_hardcoded_P(d)
         Q_true = get_hardcoded_Q(d)
         P_metrics, Q_metrics = compute_weight_metrics(attn_params, P_true, Q_true, d)
