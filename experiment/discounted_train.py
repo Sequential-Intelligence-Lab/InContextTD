@@ -10,10 +10,11 @@ from tqdm import tqdm
 from experiment.loss import weight_error_norm
 from experiment.model import LinearTransformer
 from experiment.plotter import (generate_attention_params_gif, load_data,
-                                plot_attention_params, plot_multiple_runs)
+                                plot_attention_params, plot_mean_attn_params,
+                                plot_multiple_runs)
 from experiment.prompt import MDPPrompt, MDPPromptGenerator
-from experiment.utils import (compute_msve, set_seed, solve_mspbe_weight,
-                              solve_msve_weight, in_context_learning_rate)
+from experiment.utils import (compute_msve, in_context_learning_rate, set_seed,
+                              solve_mspbe_weight, solve_msve_weight)
 
 
 def compute_tf_msve(v_tf: np.ndarray,
@@ -250,7 +251,7 @@ if __name__ == '__main__':
     l = 3
     s = 10
     gamma = 0.9
-    mode = 'sequential'
+    mode = 'auto'
     startTime = datetime.datetime.now()
     save_dir = os.path.join('./logs', "discounted_train", startTime.strftime("%Y-%m-%d-%H-%M-%S"))
     data_dirs = []
@@ -258,7 +259,7 @@ if __name__ == '__main__':
         data_dir = os.path.join(save_dir, f'seed_{seed}')
         data_dirs.append(data_dir)
         train(d, s, n, l, lmbd=0.0, mode=mode,
-              n_mdps=2_000, log_interval=10, 
+              n_mdps=5000, log_interval=10, 
               random_seed=seed, save_dir=data_dir,
               gamma=gamma)
         log, hyperparams = load_data(data_dir)
@@ -272,3 +273,4 @@ if __name__ == '__main__':
         P_metrics, Q_metrics = compute_weight_metrics(attn_params, P_true, Q_true, d)
         plot_weight_metrics(xs, l_tf, P_metrics, Q_metrics, data_dir, params=hyperparams)
     plot_multiple_runs(data_dirs, save_dir=save_dir)
+    plot_mean_attn_params(data_dirs, save_dir=save_dir)
