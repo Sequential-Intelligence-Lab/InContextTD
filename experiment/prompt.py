@@ -160,7 +160,7 @@ class MDPPrompt:
                 u += td_error * (self.phi[:, [j]] - self.phi_prime[:, [j]])
             else:
                 u += td_error * self.phi[:, [j]]
-        u /= self.n
+        u *=  lr/self.n
         if C:
             u = C @ u  # apply conditioning matrix
         new_w = w + u
