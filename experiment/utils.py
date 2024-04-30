@@ -66,18 +66,16 @@ def solve_msve_weight(steady_dist: np.ndarray,
     return np.linalg.inv(X.T @ D @ X) @ X.T @ D @ v
 
 
-def compute_msve(w: np.ndarray,
-                 steady_dist: np.ndarray,
-                 X: np.ndarray,
-                 v: np.ndarray) -> float:
+def compute_msve(v_hat: np.ndarray,
+                 v: np.ndarray,
+                 steady_dist: np.ndarray) -> float:
     '''
-    w: weight vector
-    steady_dist: steady state distribution
-    X: feature matrix
+    v_hat: predicted value
     v: true value
+    steady_dist: steady state distribution
     returns MSVE
     '''
-    error = X @ w - v
+    error = v - v_hat
     msve = steady_dist.dot(error**2)
     return msve.item()
 
@@ -105,14 +103,14 @@ def solve_mspbe_weight(steady_dist: np.ndarray,
     return w
 
 
-def compute_mspbe(w: np.ndarray,
+def compute_mspbe(v_hat: np.ndarray,
                   steady_dist: np.ndarray,
                   P: np.ndarray,
                   X: np.ndarray,
                   r: np.ndarray,
                   gamma: float):
     '''
-    w: weight vector
+    v_hat: predicted value
     steady_dist: steady state distribution
     P: transition probability matrix
     X: feature matrix
@@ -122,9 +120,7 @@ def compute_mspbe(w: np.ndarray,
     '''
     D = np.diag(steady_dist)
     projection = X @ np.linalg.inv(X.T @ D @ X) @ X.T @ D
-    v_hat = X @ w
     pbe = projection @ (r + gamma * P @ v_hat) - v_hat
-    # this quantity should be very close to zero because td fixed point brings MSPBE to zero
     mspbe = steady_dist.dot(pbe**2)
     return mspbe.item()
 
