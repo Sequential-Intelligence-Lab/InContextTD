@@ -13,31 +13,9 @@ from experiment.plotter import (generate_attention_params_gif, load_data,
                                 plot_attention_params, plot_mean_attn_params,
                                 plot_multiple_runs)
 from experiment.prompt import MDPPrompt, MDPPromptGenerator
-from experiment.utils import (compute_msve, in_context_learning_rate, set_seed,
+from experiment.utils import (compute_msve, compute_mspbe, in_context_learning_rate, set_seed,
                               solve_mspbe_weight, solve_msve_weight)
 
-
-def compute_tf_msve(v_tf: np.ndarray,
-                    v_true: np.ndarray,
-                    steady_d: np.ndarray) -> float:
-    error = v_tf - v_true
-    msve = steady_d.dot(error**2)
-    return msve.item()
-
-
-def compute_tf_mspbe(v_tf: np.ndarray,
-                     X: np.ndarray,
-                     P: np.ndarray,
-                     r: np.ndarray,
-                     gamma: float,
-                     steady_dist: np.ndarray) -> float:
-
-    D = np.diag(steady_dist)
-    projection = X @ np.linalg.inv(X.T @ D @ X) @ X.T @ D
-
-    pbe = projection @ (r + gamma * P @ v_tf - v_tf)
-    mspbe = steady_dist.dot(pbe**2)
-    return mspbe.item()
 
 def _init_log() -> dict:
     log = {'xs': [],
@@ -141,28 +119,28 @@ def train(d: int,
             prompt.reset()  # reset prompt for fair testing
             mdp = prompt.mdp
             phi = prompt.feature_fun.phi
+            steady_d = mdp.steady_d
+            true_v = mdp.v
+            reward_vec = mdp.r
+            P_pi = mdp.P
             w_tf = tf.manual_weight_extraction(prompt.context(), d).detach().numpy()
             v_tf = tf.fit_value_func(prompt.context(), torch.from_numpy(phi)).detach().numpy()
 
             log['xs'].append(i)
             log['mstde'].append(mstde.item())
 
-            w_msve = solve_msve_weight(mdp.steady_d, phi, mdp.v)
-            log['msve weight error norm'].append(
-                weight_error_norm(w_tf, w_msve).item())
+            w_msve = solve_msve_weight(steady_d, phi, true_v)
+            log['msve weight error norm'].append(weight_error_norm(w_tf, w_msve).item())
 
-            w_mspbe = solve_mspbe_weight(
-                mdp.steady_d, mdp.P, phi, mdp.r, gamma)
-            log['mspbe weight error norm'].append(
-                weight_error_norm(w_tf, w_mspbe).item())
+            w_mspbe = solve_mspbe_weight(steady_d, P_pi, phi, reward_vec, gamma)
+            log['mspbe weight error norm'].append(weight_error_norm(w_tf, w_mspbe).item())
 
-            true_msve = compute_msve(w_msve, mdp.steady_d, phi, mdp.v)
+            true_msve = compute_msve(phi @ w_msve, true_v, steady_d)
             log['true msve'].append(true_msve)
-            tf_msve = compute_tf_msve(v_tf, mdp.v, mdp.steady_d)
+            tf_msve = compute_msve(v_tf, true_v, steady_d)
             log['transformer msve'].append(tf_msve)
 
-            tf_mspbe = compute_tf_mspbe(
-                v_tf, phi, mdp.P, mdp.r, gamma, mdp.steady_d)
+            tf_mspbe = compute_mspbe(v_tf, steady_d, P_pi, phi, reward_vec, gamma)
             log['transformer mspbe'].append(tf_mspbe)
 
             w_tf_w_td_cos_sim, w_tf_w_td_diff_l2= compare_tf_td_weight(tf, prompt)
