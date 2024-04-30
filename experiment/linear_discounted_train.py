@@ -178,21 +178,7 @@ def train(d: int,
     # Save hyperparameters as JSON
     with open(os.path.join(save_dir, 'params.json'), 'w') as f:
         json.dump(hyperparameters, f)
-
-
-def run_hyperparam_search():
-    torch.manual_seed(2)
-    np.random.seed(2)
-    d = 5
-    n = 200
-    # l = 4
-    # s = int(n/10)  # number of states equal to the context length
-    s_frac = 10
-    for l in [1, 2, 4, 6]:
-        for sw in [True, False]:
-            s = int(n/s_frac)
-            train(d, s, n, l, lmbd=0.0, sample_weight=sw, epochs=25_000,
-                  log_interval=250, save_dir='l{layer}_s{s_}_sw{samp_w}'.format(layer=l, s_=s, samp_w=sw))
+            
             
 # computes the cosine similarity between the tf forward pass and TD
 def compare_tf_td_weight( tf:LinearTransformer,  prompt: MDPPrompt):
