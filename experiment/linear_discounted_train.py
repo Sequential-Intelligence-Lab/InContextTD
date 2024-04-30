@@ -223,7 +223,7 @@ if __name__ == '__main__':
         data_dir = os.path.join(save_dir, f'seed_{seed}')
         data_dirs.append(data_dir)
         train(d, s, n, l, lmbd=0.0, mode=mode,
-              n_mdps=1000, log_interval=10, 
+              n_mdps=5000, log_interval=10, 
               random_seed=seed, save_dir=data_dir,
               gamma=gamma)
         log, hyperparams = load_data(data_dir)
