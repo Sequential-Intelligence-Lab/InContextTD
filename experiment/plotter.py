@@ -93,7 +93,54 @@ def plot_multiple_runs(data_dirs: List[str],
 
     batched_Q_metrics = _batch_runs(Q_metrics_lst)
     batched_P_metrics = _batch_runs(P_metrics_lst)
-    plot_weight_metrics(xs, l, batched_P_metrics, batched_Q_metrics, save_dir, params)
+    plot_weight_metrics(xs, l, batched_P_metrics,
+                        batched_Q_metrics, save_dir, params)
+
+
+def plot_mean_attn_params(data_dirs: List[str],
+                          save_dir: str,
+                          log_step: int = -1) -> None:
+    '''
+    data_dirs: list of directories containing the data
+    save_dir: directory to save the plots
+    log_step: time step to visualize
+    '''
+    attn_dir = os.path.join(save_dir, 'mean_attention_params_plots')
+    if not os.path.exists(attn_dir):
+        os.makedirs(attn_dir)
+
+    Ps = []
+    Qs = []
+    for data_dir in data_dirs:
+        log, _ = load_data(data_dir)
+        xs, _ , attn_params = process_log(log)
+        Ps.append(attn_params['P'][log_step]) # shape (l, 2d+1, 2d+1)
+        Qs.append(attn_params['Q'][log_step]) # shape (l, 2d+1, 2d+1)
+    
+    step = xs[log_step]
+    # mean over seeds
+    mean_Ps = np.mean(Ps, axis=0)
+    mean_Qs = np.mean(Qs, axis=0)
+    
+    for l, (P, Q) in enumerate(zip(mean_Ps, mean_Qs)):  # shape (2d+1, 2d+1)
+        P = scale(P)
+        Q = scale(Q)
+        fig, axs = plt.subplots(nrows=1, ncols=2, figsize=(10, 5), sharey=True)
+        cax1 = axs[0].matshow(P, vmin=-1, vmax=1)
+        axs[0].set_title(f'Mean Layer {l+1} P Matrix at MDP {step}')
+        axs[1].matshow(Q, vmin=-1, vmax=1)
+        axs[1].set_title(f'Mean Layer {l+1} Q Matrix at MDP {step}')
+        fig.colorbar(cax1, ax=axs, orientation='vertical')
+        axs[0].tick_params(axis='both', which='both',
+                            bottom=False, top=False, 
+                            left=False, right=False)
+        axs[1].tick_params(axis='both', which='both',
+                            bottom=False, top=False, 
+                            left=False, right=False)
+        save_path = os.path.join(attn_dir, f'PQ_mean_{l+1}_{step}.png')
+        plt.savefig(save_path, dpi=300)
+        plt.close(fig)
+
 
 def plot_error_data(xs: np.ndarray,
                     error_log: dict,
@@ -222,12 +269,13 @@ def plot_attention_params(xs: np.ndarray,
     if not os.path.exists(attn_dir):
         os.makedirs(attn_dir)
 
-    P_mats, Q_mats = params['P'][log_step], params['Q'][log_step]  # both have shape (l, 2d+1, 2d+1)
+    # both have shape (l, 2d+1, 2d+1)
+    P_mats, Q_mats = params['P'][log_step], params['Q'][log_step]
     step = xs[log_step]
     assert P_mats.shape == Q_mats.shape
-    
+
     paths = []
-    for l, (P, Q) in enumerate(zip(P_mats, Q_mats)): # shape (2d+1, 2d+1)
+    for l, (P, Q) in enumerate(zip(P_mats, Q_mats)):  # shape (2d+1, 2d+1)
         P = scale(P)
         Q = scale(Q)
         fig, axs = plt.subplots(nrows=1, ncols=2, figsize=(10, 5), sharey=True)
@@ -236,8 +284,10 @@ def plot_attention_params(xs: np.ndarray,
         axs[1].matshow(Q, vmin=-1, vmax=1)
         axs[1].set_title(f'Layer {l+1} Q Matrix at MDP {step}')
         fig.colorbar(cax1, ax=axs, orientation='vertical')
-        axs[0].tick_params(axis='both', which='both', bottom=False, top=False, left=False, right=False)
-        axs[1].tick_params(axis='both', which='both', bottom=False, top=False, left=False, right=False)
+        axs[0].tick_params(axis='both', which='both',
+                           bottom=False, top=False, left=False, right=False)
+        axs[1].tick_params(axis='both', which='both',
+                           bottom=False, top=False, left=False, right=False)
         save_path = os.path.join(attn_dir, f'PQ_{l+1}_{step}.png')
         plt.savefig(save_path, dpi=300)
         plt.close(fig)
@@ -259,8 +309,9 @@ def generate_attention_params_gif(xs: dict,
     gif_dir = os.path.join(save_dir, 'attention_params_gif')
     if not os.path.exists(gif_dir):
         os.makedirs(gif_dir)
-    
-    gif_list = [[] for _ in range(l)] # list of lists to store the images for each layer
+
+    # list of lists to store the images for each layer
+    gif_list = [[] for _ in range(l)]
     for step in range(len(xs)):
         paths = plot_attention_params(xs, params, gif_dir, step)
         for i, path in enumerate(paths):
@@ -270,7 +321,9 @@ def generate_attention_params_gif(xs: dict,
     for i, gif in enumerate(gif_list):
         imageio.mimwrite(os.path.join(gif_dir, f'PQ_{i+1}.gif'), gif, fps=2)
 
-    os.rmdir(os.path.join(gif_dir, 'attention_params_plots')) # remove the empty directory containing the temporary images
+    # remove the empty directory containing the temporary images
+    os.rmdir(os.path.join(gif_dir, 'attention_params_plots'))
+
 
 def plot_weight_metrics(xs: np.ndarray,
                         l: int,
@@ -298,12 +351,13 @@ def plot_weight_metrics(xs: np.ndarray,
     for i in range(l):
         plt.figure()
         for key, metric in P_metrics.items():
-            if params['mode'] == 'sequential': # if sequential, add layer number to the label and title
+            # if sequential, add layer number to the label and title
+            if params['mode'] == 'sequential':
                 plt.title(f'TF (mode={params["mode"]}, L={params["l"]}) $P_{i}$ Metrics')
                 if key == 'norm_diff':
-                    label = (r'$||P^{TF}_{%s} - P^{TD}||_2$' %(str(i))) 
+                    label = (r'$||P^{TF}_{%s} - P^{TD}||_2$' % (str(i)))
                 elif key == 'bottom_right':
-                    label = (r'$P^{TF}_{%s}[-1, -1]$' %(str(i)))
+                    label = (r'$P^{TF}_{%s}[-1, -1]$' % (str(i)))
                 elif key == 'avg_abs_all_others':
                     label = 'Avg Abs Others'
             else:
@@ -321,8 +375,10 @@ def plot_weight_metrics(xs: np.ndarray,
             plt.fill_between(xs, mean_metric[:, i] - std_metric[:, i],
                              mean_metric[:, i] + std_metric[:, i], alpha=0.2)
             plt.xlabel('# MDPs')
-            plt.legend(frameon=True,framealpha=0.8, fontsize='small').set_alpha(0.5)
-        plt.savefig(os.path.join(P_metrics_dir, f'P_metrics_{i+1}.png'), dpi=300)
+            plt.legend(frameon=True, framealpha=0.8,
+                       fontsize='small').set_alpha(0.5)
+        plt.savefig(os.path.join(P_metrics_dir,
+                    f'P_metrics_{i+1}.png'), dpi=300)
         plt.close()
 
     # same metric, different layers
@@ -345,18 +401,21 @@ def plot_weight_metrics(xs: np.ndarray,
     for i in range(l):
         plt.figure()
         for key, metric in Q_metrics.items():
-            if params['mode'] == 'sequential': # if sequential, add layer number to the label and title
-                plt.title(f'TF (mode={params["mode"]}, L={params["l"]}) $Q_{i}$ Metrics')
+            # if sequential, add layer number to the label and title
+            if params['mode'] == 'sequential':
+                plt.title(
+                    f'TF (mode={params["mode"]}, L={params["l"]}) $Q_{i}$ Metrics')
                 if key == 'norm_diff':
-                    label = (r'$||Q^{TF}_{%s} - Q^{TD}||_2$' %(str(i))) 
+                    label = (r'$||Q^{TF}_{%s} - Q^{TD}||_2$' % (str(i)))
                 elif key == 'upper_left_trace':
-                    label = (r'tr$(Q^{TF}_{%s}[:d, :d])$' %str(i))
+                    label = (r'tr$(Q^{TF}_{%s}[:d, :d])$' % str(i))
                 elif key == 'upper_right_trace':
-                    label = (r'tr$(Q^{TF}_{%s}[:d, d:2d])$' %str(i))
+                    label = (r'tr$(Q^{TF}_{%s}[:d, d:2d])$' % str(i))
                 elif key == 'avg_abs_all_others':
                     label = 'Avg Abs Others'
             else:
-                plt.title(f'TF (mode={params["mode"]}, L={params["l"]}) $Q$ Metrics')
+                plt.title(
+                    f'TF (mode={params["mode"]}, L={params["l"]}) $Q$ Metrics')
                 if key == 'norm_diff':
                     label = (r'$||Q^{TF} - Q^{TD}||_2$')
                 elif key == 'upper_left_trace':
@@ -372,8 +431,10 @@ def plot_weight_metrics(xs: np.ndarray,
             plt.fill_between(xs, mean_metric[:, i] - std_metric[:, i],
                              mean_metric[:, i] + std_metric[:, i], alpha=0.2)
             plt.xlabel('# MDPs')
-            plt.legend(frameon=True,framealpha=0.8, fontsize='small').set_alpha(0.5)
-        plt.savefig(os.path.join(Q_metrics_dir, f'Q_metrics_{i+1}.png'), dpi=300)
+            plt.legend(frameon=True, framealpha=0.8,
+                       fontsize='small').set_alpha(0.5)
+        plt.savefig(os.path.join(Q_metrics_dir,
+                    f'Q_metrics_{i+1}.png'), dpi=300)
         plt.close()
 
     # same metric, different layers
