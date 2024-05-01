@@ -12,11 +12,10 @@ class LinearAttention(nn.Module):
         super(LinearAttention, self).__init__()
         self.d = d
         self.n = n
-        self.lmbd = lmbd
         M = torch.eye(n+1)
         for col in range(n):
             for row in range(col+1, n):
-                M[row, col] = self.lmbd*M[row-1, col]
+                M[row, col] = lmbd*M[row-1, col]
         M[-1, -1] = 0
         self.M = M
         self.P = nn.Parameter(torch.empty(2 * d + 1, 2 * d + 1))
@@ -87,7 +86,6 @@ class LinearTransformer(nn.Module):
         weight = torch.stack(weight, dim=0)
         return weight.reshape((d, 1))
 
-
     def fit_value_func(self,
                        context: torch.Tensor,
                        X: torch.Tensor,
@@ -128,6 +126,104 @@ class LinearTransformer(nn.Module):
             return -Z_tf[-1, -1]
 
 
+class Attention(nn.Module):
+    def __init__(self,
+                 d: int,
+                 n: int,
+                 lmbd: float = 0.0):
+        '''
+        d: feature dimension
+        n: context length
+        lmbd: eligibility trace decay
+        '''
+        super(Attention, self).__init__()
+        self.d = d
+        self.n = n
+        M = torch.eye(n + 1)
+        for col in range(n):
+            for row in range(col + 1, n):
+                M[row, col] = lmbd * M[row - 1, col]
+        M[-1, -1] = 0
+
+        self.M = M
+        self.P = nn.Parameter(torch.empty(2 * d + 1, 2 * d + 1))
+        self.Q = nn.Parameter(torch.empty(2 * d + 1, 2 * d + 1))
+
+    def forward(self, Z):
+        X = Z.T @ self.Q @ Z
+        return Z + 1.0 / self.n * self.P @ Z @ self.M @ torch.softmax(X, dim = 1)
+
+
+class Transformer(nn.Module):
+    def __init__(self,
+                 d: int,
+                 n: int,
+                 l: int,
+                 lmbd: float = 0.0,
+                 mode = 'auto'):
+        '''
+        d: feature dimension
+        n: context length
+        mode: 'auto' or 'sequential'
+        '''
+        super(Transformer, self).__init__()
+        self.d = d
+        self.n = n
+        self.l = l
+        self.mode = mode
+        if mode == 'auto':
+            attn = Attention(d, n, lmbd)
+            nn.init.xavier_normal_(attn.P, gain = 0.1)
+            nn.init.xavier_normal_(attn.Q, gain = 0.1)
+            self.attn = attn
+        elif mode == 'sequential':
+            self.layers = nn.ModuleList([Attention(d, n, lmbd) for _ in range(l)])
+            for attn in self.layers:
+                nn.init.xavier_normal_(attn.P, gain=0.1/l)
+                nn.init.xavier_normal_(attn.Q, gain=0.1/l)
+        else:
+            raise ValueError('mode must be either auto or sequential')
+
+    def forward(self, Z):
+        '''
+        Z: prompt of shape (2*d+1, n+1)
+        '''
+        if self.mode == 'auto':
+            for _ in range(self.l):
+                Z = self.attn(Z)
+        else:
+            for attn in self.layers:
+                Z = attn(Z)
+        return Z
+
+    def fit_value_func(self,
+                       context: torch.Tensor,
+                       X: torch.Tensor) -> torch.Tensor:
+        '''
+        context: the context of shape
+        X: features of shape (s, d)
+        returns the fitted value function given the context in shape (s, 1)
+        '''
+        v_vec = []
+        for feature in X:
+            feature_col = torch.zeros((2 * self.d + 1, 1))
+            feature_col[:self.d, 0] = feature
+            Z_p = torch.cat([context, feature_col], dim=1)
+            v = self.pred_v(Z_p)
+            v_vec.append(v)
+        tf_v = torch.stack(v_vec, dim=0).unsqueeze(1)
+        return tf_v
+
+    def pred_v(self, Z: torch.Tensor) -> torch.Tensor:
+        '''
+        Z: prompt of shape (2*d+1, n+1)
+        manual: whether to use manual weight extraction or not
+        predict the value of the query feature
+        '''
+        Z_tf = self.forward(Z)
+        return -Z_tf[-1, -1]
+
+
 if __name__ == '__main__':
     from experiment.prompt import MDPPromptGenerator
     d = 2
@@ -143,8 +239,9 @@ if __name__ == '__main__':
     prompt_gen.reset_mdp(sample_weight=False)
     mdp_prompt = prompt_gen.get_prompt()
     Z_0 = mdp_prompt.reset()
-    ltf = LinearTransformer(d, n, l, lmbd, mode='auto')
-    v_func = ltf.fit_value_func(mdp_prompt.context(), mdp_prompt.get_feature_mat(), manual=False)
+    tf = Transformer(d, n, l, lmbd, mode='auto')
+    v_func = tf.fit_value_func(mdp_prompt.context(
+    ), mdp_prompt.get_feature_mat(), manual=False)
     print(v_func.shape)
-    v_tf = ltf.pred_v(Z_0)
+    v_tf = tf.pred_v(Z_0.to(torch.float))
     print(v_tf)

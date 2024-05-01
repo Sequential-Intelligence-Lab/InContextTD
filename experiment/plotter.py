@@ -20,8 +20,8 @@ def load_data(data_dir: str) -> Tuple[dict, dict]:
             open(os.path.join(data_dir, 'params.json'), 'r') as params_file:
         log = {key: data[key] for key in data}
         # Assuming params is used somewhere else
-        params = json.load(params_file)
-    return log, params
+        hyperparams = json.load(params_file)
+    return log, hyperparams
 
 
 def process_log(log: dict) -> Tuple[np.ndarray, dict, dict]:
@@ -42,7 +42,8 @@ def process_log(log: dict) -> Tuple[np.ndarray, dict, dict]:
                 'transformer mspbe',
                 'implicit w_tf and w_td cos sim',
                 'w_tf w_td diff l2'):
-        error_log[key] = np.expand_dims(log[key], axis=0)
+        if key in log:
+            error_log[key] = np.expand_dims(log[key], axis=0)
 
     return log['xs'], error_log, attn_params
 
@@ -172,85 +173,102 @@ def plot_error_data(xs: np.ndarray,
     plt.savefig(os.path.join(error_dir, 'loss_mstde.png'), dpi=300)
     plt.close()
 
-    # Weight norm
-    mean_msve_weight_error_norm = np.mean(
-        error_log['msve weight error norm'], axis=0)
-    mean_mspbe_weight_error_norm = np.mean(
-        error_log['mspbe weight error norm'], axis=0)
-    std_msve_weight_error_norm = np.std(
-        error_log['msve weight error norm'], axis=0)
-    std_mspbe_weight_error_norm = np.std(
-        error_log['mspbe weight error norm'], axis=0)
-    plt.figure()
-    plt.plot(xs, mean_msve_weight_error_norm,
-             label='MSVE Weight Error Norm')
-    plt.fill_between(xs, mean_msve_weight_error_norm - std_msve_weight_error_norm,
-                     mean_msve_weight_error_norm + std_msve_weight_error_norm, alpha=0.2)
-    plt.plot(xs, mean_mspbe_weight_error_norm,
-             label='MSPBE Weight Error Norm')
-    plt.fill_between(xs, mean_mspbe_weight_error_norm - std_mspbe_weight_error_norm,
-                     mean_mspbe_weight_error_norm + std_mspbe_weight_error_norm, alpha=0.2)
-    plt.xlabel('# MDPs')
-    plt.ylabel('Weight Error L2 Norm')
-    plt.title('Weight Error Norm vs # MDPs')
-    plt.legend()
-    plt.savefig(os.path.join(error_dir, 'weight_error_norm.png'), dpi=300)
-    plt.close()
+    if params['linear']:
+        # Weight norm
+        mean_msve_weight_error_norm = np.mean(
+            error_log['msve weight error norm'], axis=0)
+        mean_mspbe_weight_error_norm = np.mean(
+            error_log['mspbe weight error norm'], axis=0)
+        std_msve_weight_error_norm = np.std(
+            error_log['msve weight error norm'], axis=0)
+        std_mspbe_weight_error_norm = np.std(
+            error_log['mspbe weight error norm'], axis=0)
+        plt.figure()
+        plt.plot(xs, mean_msve_weight_error_norm,
+                label='MSVE Weight Error Norm')
+        plt.fill_between(xs, mean_msve_weight_error_norm - std_msve_weight_error_norm,
+                        mean_msve_weight_error_norm + std_msve_weight_error_norm, alpha=0.2)
+        plt.plot(xs, mean_mspbe_weight_error_norm,
+                label='MSPBE Weight Error Norm')
+        plt.fill_between(xs, mean_mspbe_weight_error_norm - std_mspbe_weight_error_norm,
+                        mean_mspbe_weight_error_norm + std_mspbe_weight_error_norm, alpha=0.2)
+        plt.xlabel('# MDPs')
+        plt.ylabel('Weight Error L2 Norm')
+        plt.title('Weight Error Norm vs # MDPs')
+        plt.legend()
+        plt.savefig(os.path.join(error_dir, 'weight_error_norm.png'), dpi=300)
+        plt.close()
 
     # Value error
-    mean_true_msve = np.mean(error_log['true msve'], axis=0)
-    mean_tf_msve = np.mean(error_log['transformer msve'], axis=0)
-    std_true_msve = np.std(error_log['true msve'], axis=0)
-    std_tf_msve = np.std(error_log['transformer msve'], axis=0)
+    if params['linear']:
+        mean_true_msve = np.mean(error_log['true msve'], axis=0)
+        mean_tf_msve = np.mean(error_log['transformer msve'], axis=0)
+        std_true_msve = np.std(error_log['true msve'], axis=0)
+        std_tf_msve = np.std(error_log['transformer msve'], axis=0)
 
-    plt.figure()
-    plt.plot(xs, mean_true_msve, label='True MSVE')
-    plt.fill_between(xs, mean_true_msve - std_true_msve,
-                     mean_true_msve + std_true_msve, alpha=0.2)
-    plt.plot(xs, mean_tf_msve, label='Transformer MSVE')
-    plt.fill_between(xs, mean_tf_msve - std_tf_msve,
-                     mean_tf_msve + std_tf_msve, alpha=0.2)
-    plt.xlabel('# MDPs')
-    plt.ylabel('MSVE')
-    plt.title('MSVE vs # MDPs')
-    plt.legend()
-    plt.savefig(os.path.join(error_dir, 'msve.png'), dpi=300)
-    plt.close()
+        plt.figure()
+        plt.plot(xs, mean_true_msve, label='True MSVE')
+        plt.fill_between(xs, mean_true_msve - std_true_msve,
+                        mean_true_msve + std_true_msve, alpha=0.2)
+        plt.plot(xs, mean_tf_msve, label='Transformer MSVE')
+        plt.fill_between(xs, mean_tf_msve - std_tf_msve,
+                        mean_tf_msve + std_tf_msve, alpha=0.2)
+        plt.xlabel('# MDPs')
+        plt.ylabel('MSVE')
+        plt.title('MSVE vs # MDPs')
+        plt.legend()
+        plt.savefig(os.path.join(error_dir, 'msve.png'), dpi=300)
+        plt.close()
+    else:
+        mean_tf_msve = np.mean(error_log['transformer msve'], axis=0)
+        std_tf_msve = np.std(error_log['transformer msve'], axis=0)
+        plt.figure()
+        plt.plot(xs, mean_tf_msve, label='Transformer MSVE')
+        plt.fill_between(xs, mean_tf_msve - std_tf_msve,
+                        mean_tf_msve + std_tf_msve, alpha=0.2)
+        plt.xlabel('# MDPs')
+        plt.ylabel('MSVE')
+        plt.title('MSVE vs # MDPs')
+        plt.legend()
+        plt.savefig(os.path.join(error_dir, 'msve.png'), dpi=300)
+        plt.close()
 
-    # MSPBE
-    mean_tf_mspbe = np.mean(error_log['transformer mspbe'], axis=0)
-    std_tf_mspbe = np.std(error_log['transformer mspbe'], axis=0)
-    plt.figure()
-    plt.plot(xs, mean_tf_mspbe, label='TF')
-    plt.fill_between(xs, mean_tf_mspbe - std_tf_mspbe,
-                     mean_tf_mspbe + std_tf_mspbe, alpha=0.2)
-    plt.xlabel('# MDPs')
-    plt.ylabel('MSPBE')
-    plt.ylim(0)
-    plt.title(f"TF (mode={params['mode']} L={params['l']}) MSPBE")
-    plt.legend()
-    plt.savefig(os.path.join(error_dir, 'mspbe.png'), dpi=300)
-    plt.close()
+    if params['linear']:
+        # MSPBE
+        mean_tf_mspbe = np.mean(error_log['transformer mspbe'], axis=0)
+        std_tf_mspbe = np.std(error_log['transformer mspbe'], axis=0)
+        plt.figure()
+        plt.plot(xs, mean_tf_mspbe, label='TF')
+        plt.fill_between(xs, mean_tf_mspbe - std_tf_mspbe,
+                        mean_tf_mspbe + std_tf_mspbe, alpha=0.2)
+        plt.xlabel('# MDPs')
+        plt.ylabel('MSPBE')
+        plt.ylim(0)
+        plt.title(f"TF (mode={params['mode']} L={params['l']}) MSPBE")
+        plt.legend()
+        plt.savefig(os.path.join(error_dir, 'mspbe.png'), dpi=300)
+        plt.close()
 
-    # TF weight and TD weight comparison
-    mean_cos_sim = np.mean(error_log['implicit w_tf and w_td cos sim'], axis=0)
-    std_cos_sim = np.std(error_log['implicit w_tf and w_td cos sim'], axis=0)
-    mean_weight_diff = np.mean(error_log['w_tf w_td diff l2'], axis=0)
-    std_weight_diff = np.std(error_log['w_tf w_td diff l2'], axis=0)
-    plt.figure()
-    plt.plot(xs, mean_cos_sim, label='Cosine Similarity')
-    plt.fill_between(xs, mean_cos_sim - std_cos_sim,
-                     mean_cos_sim + std_cos_sim, alpha=0.2)
-    plt.plot(xs, mean_weight_diff, label='L2 Norm Weight Difference')
-    plt.fill_between(xs, mean_weight_diff - std_weight_diff,
-                     mean_weight_diff + std_weight_diff, alpha=0.2)
-    plt.fill_between(xs, mean_cos_sim - std_cos_sim,
-                     mean_cos_sim + std_cos_sim, alpha=0.2)
-    plt.xlabel('# MDPs')
-    plt.title('Transformer Implicit weight and l-step TD weight Cosine Similarity')
-    plt.legend()
-    plt.savefig(os.path.join(error_dir, 'tf_td_weight_comparison.png'), dpi=300)
-    plt.close()
+    if params['linear']:
+        # TF weight and TD weight comparison
+        mean_cos_sim = np.mean(error_log['implicit w_tf and w_td cos sim'], axis=0)
+        std_cos_sim = np.std(error_log['implicit w_tf and w_td cos sim'], axis=0)
+        mean_weight_diff = np.mean(error_log['w_tf w_td diff l2'], axis=0)
+        std_weight_diff = np.std(error_log['w_tf w_td diff l2'], axis=0)
+        plt.figure()
+        plt.plot(xs, mean_cos_sim, label='Cosine Similarity')
+        plt.fill_between(xs, mean_cos_sim - std_cos_sim,
+                        mean_cos_sim + std_cos_sim, alpha=0.2)
+        plt.plot(xs, mean_weight_diff, label='L2 Norm Weight Difference')
+        plt.fill_between(xs, mean_weight_diff - std_weight_diff,
+                        mean_weight_diff + std_weight_diff, alpha=0.2)
+        plt.fill_between(xs, mean_cos_sim - std_cos_sim,
+                        mean_cos_sim + std_cos_sim, alpha=0.2)
+        plt.xlabel('# MDPs')
+        plt.title('Transformer Implicit weight and l-step TD weight Cosine Similarity')
+        plt.legend()
+        plt.savefig(os.path.join(error_dir, 'tf_td_weight_comparison.png'), dpi=300)
+        plt.close()
 
 
 def plot_attention_params(xs: np.ndarray,

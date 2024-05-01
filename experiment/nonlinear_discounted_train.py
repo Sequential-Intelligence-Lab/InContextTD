@@ -7,28 +7,21 @@ import torch
 import torch.optim as optim
 from tqdm import tqdm
 
-from experiment.loss import weight_error_norm
-from experiment.model import LinearTransformer
+from experiment.model import Transformer
 from experiment.plotter import (generate_attention_params_gif, load_data,
                                 plot_attention_params, plot_mean_attn_params,
                                 plot_multiple_runs)
 from experiment.prompt import MDPPrompt, MDPPromptGenerator
-from experiment.utils import (compute_msve, compute_mspbe, in_context_learning_rate, set_seed,
-                              solve_mspbe_weight, solve_msve_weight)
+from experiment.utils import (compute_msve, in_context_learning_rate, set_seed)
 
 
 def _init_log() -> dict:
     log = {'xs': [],
            'mstde': [],
-           'msve weight error norm': [],
-           'mspbe weight error norm': [],
            'true msve': [],
            'transformer msve': [],
-           'transformer mspbe': [],
            'P': [],
-           'Q': [],
-           'implicit w_tf and w_td cos sim': [],
-           'w_tf w_td diff l2': []
+           'Q': []
            }
     return log
 
@@ -36,7 +29,7 @@ def _init_save_dir(save_dir: str) -> None:
     if save_dir is None:
         startTime = datetime.datetime.now()
         save_dir = os.path.join('./logs', 
-                                "linear_discounted_train", 
+                                "nonlinear_discounted_train", 
                                 startTime.strftime("%Y-%m-%d-%H-%M-%S"))
         
     # Create directory if it doesn't exist
@@ -56,7 +49,6 @@ def train(d: int,
           gamma: float = 0.9,
           lmbd: float = 0.0,
           sample_weight: bool = False,
-          manual: bool = False,
           mode: str = 'auto',
           lr: float = 0.001,
           weight_decay=1e-6,
@@ -74,7 +66,6 @@ def train(d: int,
     gamma: discount factor
     lmbd: eligibility trace decay
     sample_weight: sample a random true weight vector
-    manual: whether to use manual weight extraction or not
     mode: 'auto' or 'sequential'
     lr: learning rate
     weight_decay: regularization
@@ -87,7 +78,7 @@ def train(d: int,
 
     set_seed(random_seed)
 
-    tf = LinearTransformer(d, n, l, lmbd, mode=mode)
+    tf = Transformer(d, n, l, lmbd, mode=mode)
 
     opt = optim.Adam(tf.parameters(), lr=lr, weight_decay=weight_decay)
 
@@ -103,10 +94,10 @@ def train(d: int,
         for _ in range(n_batch_per_mdp):
             mstde = 0.0
             Z_0 = prompt.reset()
-            v_current = tf.pred_v(Z_0, manual=manual)
+            v_current = tf.pred_v(Z_0)
             for _ in range(mini_batch_size):
                 Z_next, reward = prompt.step()  # slide window
-                v_next = tf.pred_v(Z_next, manual=manual)
+                v_next = tf.pred_v(Z_next)
                 tde = reward + gamma*v_next.detach() - v_current
                 mstde += tde**2
                 v_current = v_next
@@ -121,31 +112,14 @@ def train(d: int,
             phi = prompt.feature_fun.phi
             steady_d = mdp.steady_d
             true_v = mdp.v
-            reward_vec = mdp.r
-            P_pi = mdp.P
-            w_tf = tf.manual_weight_extraction(prompt.context(), d).detach().numpy()
             v_tf = tf.fit_value_func(prompt.context(), torch.from_numpy(phi)).detach().numpy()
 
             log['xs'].append(i)
             log['mstde'].append(mstde.item())
 
-            w_msve = solve_msve_weight(steady_d, phi, true_v)
-            log['msve weight error norm'].append(weight_error_norm(w_tf, w_msve).item())
-
-            w_mspbe = solve_mspbe_weight(steady_d, P_pi, phi, reward_vec, gamma)
-            log['mspbe weight error norm'].append(weight_error_norm(w_tf, w_mspbe).item())
-
-            true_msve = compute_msve(phi @ w_msve, true_v, steady_d)
-            log['true msve'].append(true_msve)
             tf_msve = compute_msve(v_tf, true_v, steady_d)
             log['transformer msve'].append(tf_msve)
 
-            tf_mspbe = compute_mspbe(v_tf, steady_d, P_pi, phi, reward_vec, gamma)
-            log['transformer mspbe'].append(tf_mspbe)
-
-            w_tf_w_td_cos_sim, w_tf_w_td_diff_l2= compare_tf_td_weight(tf, prompt)
-            log['implicit w_tf and w_td cos sim'].append(w_tf_w_td_cos_sim)
-            log['w_tf w_td diff l2'].append(w_tf_w_td_diff_l2)
 
             if mode=='auto':
                 log['P'].append([tf.attn.P.detach().numpy().copy()])
@@ -164,7 +138,6 @@ def train(d: int,
         'lmbd': lmbd,
         'gamma': gamma,
         'sample_weight': sample_weight,
-        'manual': manual,
         'n_mdps': n_mdps,
         'mini_batch_size': mini_batch_size,
         'n_batch_per_mdp': n_batch_per_mdp,
@@ -173,7 +146,7 @@ def train(d: int,
         'log_interval': log_interval,
         'random_seed': random_seed,
         'mode': mode,
-        'linear': True
+        'linear': False
     }
 
     # Save hyperparameters as JSON
@@ -182,7 +155,7 @@ def train(d: int,
             
             
 # computes the cosine similarity between the tf forward pass and TD
-def compare_tf_td_weight( tf:LinearTransformer,  prompt: MDPPrompt):
+def compare_tf_td_weight( tf:Transformer,  prompt: MDPPrompt):
     '''
     computes the cosine similarity between the transformer forward pass implicit weight and the TD update weight 
     tf: an instance of LinearTransformer
@@ -218,13 +191,13 @@ if __name__ == '__main__':
     gamma = 0.9
     mode = 'auto'
     startTime = datetime.datetime.now()
-    save_dir = os.path.join('./logs', "linear_discounted_train", startTime.strftime("%Y-%m-%d-%H-%M-%S"))
+    save_dir = os.path.join('./logs', "nonlinear_discounted_train", startTime.strftime("%Y-%m-%d-%H-%M-%S"))
     data_dirs = []
-    for seed in [35, 42, 99, 200, 328]:
+    for seed in [38, 42, 99, 128, 256]:
         data_dir = os.path.join(save_dir, f'seed_{seed}')
         data_dirs.append(data_dir)
         train(d, s, n, l, lmbd=0.0, mode=mode,
-              n_mdps=3_000, log_interval=10, 
+              n_mdps=2_000, log_interval=10, 
               random_seed=seed, save_dir=data_dir,
               gamma=gamma)
         log, hyperparams = load_data(data_dir)
