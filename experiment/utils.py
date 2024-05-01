@@ -120,7 +120,7 @@ def compute_mspbe(v_hat: np.ndarray,
     '''
     D = np.diag(steady_dist)
     projection = X @ np.linalg.inv(X.T @ D @ X) @ X.T @ D
-    pbe = projection @ (r + gamma * P @ v_hat) - v_hat
+    pbe = projection @ (r + gamma * P @ v_hat - v_hat)
     mspbe = steady_dist.dot(pbe**2)
     return mspbe.item()
 
