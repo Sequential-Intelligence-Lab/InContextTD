@@ -20,8 +20,8 @@ def load_data(data_dir: str) -> Tuple[dict, dict]:
             open(os.path.join(data_dir, 'params.json'), 'r') as params_file:
         log = {key: data[key] for key in data}
         # Assuming params is used somewhere else
-        params = json.load(params_file)
-    return log, params
+        hyperparams = json.load(params_file)
+    return log, hyperparams
 
 
 def process_log(log: dict) -> Tuple[np.ndarray, dict, dict]:
@@ -31,18 +31,29 @@ def process_log(log: dict) -> Tuple[np.ndarray, dict, dict]:
     '''
     Ps, Qs = log['P'], log['Q']
     aligned_Ps, aligned_Qs = align_matrix_sign(Ps, Qs)
-    attn_params = {'P': aligned_Ps, 'Q': aligned_Qs}
+    alphas = np.array(log['alpha'])
+    attn_params = {'P': aligned_Ps, 'Q': aligned_Qs, 'alpha': alphas}
 
     error_log = {}
     for key in ('mstde',
+                'mstde hard',
                 'msve weight error norm',
+                'msve weight error norm hard',
                 'mspbe weight error norm',
+                'mspbe weight error norm hard',
                 'true msve',
                 'transformer msve',
+                'transformer msve hard',
                 'transformer mspbe',
-                'implicit w_tf and w_td cos sim',
-                'w_tf w_td diff l2'):
-        error_log[key] = np.expand_dims(log[key], axis=0)
+                'transformer mspbe hard',
+                'sensitivity cos sim',
+                'sensitivity l2 dist',
+                'zero order cos sim',
+                'zero order l2 dist',
+                'first order cos sim',
+                'first order l2 dist'):
+        if key in log:
+            error_log[key] = np.expand_dims(log[key], axis=0)
 
     return log['xs'], error_log, attn_params
 
@@ -72,7 +83,6 @@ def plot_multiple_runs(data_dirs: List[str],
     error_log_lst = []
     P_metrics_lst = []
     Q_metrics_lst = []
-    auto = True
     # Load data from directories
     for data_dir in data_dirs:
         log, params = load_data(data_dir)
@@ -111,17 +121,21 @@ def plot_mean_attn_params(data_dirs: List[str],
 
     Ps = []
     Qs = []
+    alphas = []
     for data_dir in data_dirs:
         log, _ = load_data(data_dir)
-        xs, _ , attn_params = process_log(log)
-        Ps.append(attn_params['P'][log_step]) # shape (l, 2d+1, 2d+1)
-        Qs.append(attn_params['Q'][log_step]) # shape (l, 2d+1, 2d+1)
-    
+        xs, _, attn_params = process_log(log)
+        Ps.append(attn_params['P'][log_step])  # shape (l, 2d+1, 2d+1)
+        Qs.append(attn_params['Q'][log_step])  # shape (l, 2d+1, 2d+1)
+        alphas.append(attn_params['alpha'])
+
     step = xs[log_step]
     # mean over seeds
     mean_Ps = np.mean(Ps, axis=0)
     mean_Qs = np.mean(Qs, axis=0)
-    
+    mean_alphas = np.mean(alphas, axis=0)
+    std_alphas = np.std(alphas, axis=0)
+
     for l, (P, Q) in enumerate(zip(mean_Ps, mean_Qs)):  # shape (2d+1, 2d+1)
         P = scale(P)
         Q = scale(Q)
@@ -132,14 +146,24 @@ def plot_mean_attn_params(data_dirs: List[str],
         axs[1].set_title(f'Mean Layer {l+1} Q Matrix at MDP {step}')
         fig.colorbar(cax1, ax=axs, orientation='vertical')
         axs[0].tick_params(axis='both', which='both',
-                            bottom=False, top=False, 
-                            left=False, right=False)
+                           bottom=False, top=False,
+                           left=False, right=False)
         axs[1].tick_params(axis='both', which='both',
-                            bottom=False, top=False, 
-                            left=False, right=False)
+                           bottom=False, top=False,
+                           left=False, right=False)
         save_path = os.path.join(attn_dir, f'PQ_mean_{l+1}_{step}.png')
         plt.savefig(save_path, dpi=300)
         plt.close(fig)
+
+    fig = plt.figure(figsize=(10, 5))
+    plt.plot(xs, mean_alphas)
+    plt.fill_between(xs, mean_alphas - std_alphas,
+                     mean_alphas + std_alphas, alpha=0.2)
+    plt.xlabel('# MDPs')
+    plt.ylabel('Alpha')
+    plt.title('Mean Alpha vs # MDPs')
+    plt.savefig(os.path.join(attn_dir, 'alpha.png'))
+    plt.close(fig)
 
 
 def plot_error_data(xs: np.ndarray,
@@ -161,10 +185,15 @@ def plot_error_data(xs: np.ndarray,
     # MSTDE
     mean_mstde = np.mean(error_log['mstde'], axis=0)
     std_mstde = np.std(error_log['mstde'], axis=0)
+    mean_mstde_hard = np.mean(error_log['mstde hard'], axis=0)
+    std_mstde_hard = np.std(error_log['mstde hard'], axis=0)
     plt.figure()
     plt.plot(xs, mean_mstde, label='MSTDE')
     plt.fill_between(xs, mean_mstde - std_mstde,
                      mean_mstde + std_mstde, alpha=0.2)
+    plt.plot(xs, mean_mstde_hard, label='MSTDE Hard')
+    plt.fill_between(xs, mean_mstde_hard - std_mstde_hard,
+                     mean_mstde_hard + std_mstde_hard, alpha=0.2)
     plt.xlabel('# MDPs')
     plt.ylabel('Loss (MSTDE)')
     plt.title('Loss (MSTDE) vs # MDPs')
@@ -172,85 +201,159 @@ def plot_error_data(xs: np.ndarray,
     plt.savefig(os.path.join(error_dir, 'loss_mstde.png'), dpi=300)
     plt.close()
 
-    # Weight norm
-    mean_msve_weight_error_norm = np.mean(
-        error_log['msve weight error norm'], axis=0)
-    mean_mspbe_weight_error_norm = np.mean(
-        error_log['mspbe weight error norm'], axis=0)
-    std_msve_weight_error_norm = np.std(
-        error_log['msve weight error norm'], axis=0)
-    std_mspbe_weight_error_norm = np.std(
-        error_log['mspbe weight error norm'], axis=0)
-    plt.figure()
-    plt.plot(xs, mean_msve_weight_error_norm,
-             label='MSVE Weight Error Norm')
-    plt.fill_between(xs, mean_msve_weight_error_norm - std_msve_weight_error_norm,
-                     mean_msve_weight_error_norm + std_msve_weight_error_norm, alpha=0.2)
-    plt.plot(xs, mean_mspbe_weight_error_norm,
-             label='MSPBE Weight Error Norm')
-    plt.fill_between(xs, mean_mspbe_weight_error_norm - std_mspbe_weight_error_norm,
-                     mean_mspbe_weight_error_norm + std_mspbe_weight_error_norm, alpha=0.2)
-    plt.xlabel('# MDPs')
-    plt.ylabel('Weight Error L2 Norm')
-    plt.title('Weight Error Norm vs # MDPs')
-    plt.legend()
-    plt.savefig(os.path.join(error_dir, 'weight_error_norm.png'), dpi=300)
-    plt.close()
+    if params['linear']:
+        # Weight norm
+        mean_msve_weight_error_norm = np.mean(
+            error_log['msve weight error norm'], axis=0)
+        mean_mspbe_weight_error_norm = np.mean(
+            error_log['mspbe weight error norm'], axis=0)
+        std_msve_weight_error_norm = np.std(
+            error_log['msve weight error norm'], axis=0)
+        std_mspbe_weight_error_norm = np.std(
+            error_log['mspbe weight error norm'], axis=0)
+        mean_msve_weight_error_norm_hard = np.mean(
+            error_log['msve weight error norm hard'], axis=0)
+        mean_mspbe_weight_error_norm_hard = np.mean(
+            error_log['mspbe weight error norm hard'], axis=0)
+        std_msve_weight_error_norm_hard = np.std(
+            error_log['msve weight error norm hard'], axis=0)
+        std_mspbe_weight_error_norm_hard = np.std(
+            error_log['mspbe weight error norm hard'], axis=0)
+        plt.figure()
+        plt.plot(xs, mean_msve_weight_error_norm, label='MSVE WEN')
+        plt.fill_between(xs, mean_msve_weight_error_norm - std_msve_weight_error_norm,
+                         mean_msve_weight_error_norm + std_msve_weight_error_norm, alpha=0.2)
+        plt.plot(xs, mean_mspbe_weight_error_norm, label='MSPBE WEN')
+        plt.fill_between(xs, mean_mspbe_weight_error_norm - std_mspbe_weight_error_norm,
+                         mean_mspbe_weight_error_norm + std_mspbe_weight_error_norm, alpha=0.2)
+        plt.plot(xs, mean_msve_weight_error_norm_hard, label='MSVE WEN Hard')
+        plt.fill_between(xs, mean_msve_weight_error_norm_hard - std_msve_weight_error_norm_hard,
+                         mean_msve_weight_error_norm_hard + std_msve_weight_error_norm_hard, alpha=0.2)
+        plt.plot(xs, mean_mspbe_weight_error_norm_hard, label='MSPBE WEN Hard')
+        plt.fill_between(xs, mean_mspbe_weight_error_norm_hard - std_mspbe_weight_error_norm_hard,
+                         mean_mspbe_weight_error_norm_hard + std_mspbe_weight_error_norm_hard, alpha=0.2)
+        plt.xlabel('# MDPs')
+        plt.ylabel('Weight Error L2 Norm')
+        plt.title('Weight Error Norm vs # MDPs')
+        plt.legend()
+        plt.savefig(os.path.join(error_dir, 'weight_error_norm.png'), dpi=300)
+        plt.close()
 
     # Value error
-    mean_true_msve = np.mean(error_log['true msve'], axis=0)
-    mean_tf_msve = np.mean(error_log['transformer msve'], axis=0)
-    std_true_msve = np.std(error_log['true msve'], axis=0)
-    std_tf_msve = np.std(error_log['transformer msve'], axis=0)
+    if params['linear']:
+        mean_true_msve = np.mean(error_log['true msve'], axis=0)
+        mean_tf_msve = np.mean(error_log['transformer msve'], axis=0)
+        mean_tf_msve_hard = np.mean(error_log['transformer msve hard'], axis=0)
+        std_true_msve = np.std(error_log['true msve'], axis=0)
+        std_tf_msve = np.std(error_log['transformer msve'], axis=0)
+        std_tf_msve_hard = np.std(error_log['transformer msve hard'], axis=0)
 
-    plt.figure()
-    plt.plot(xs, mean_true_msve, label='True MSVE')
-    plt.fill_between(xs, mean_true_msve - std_true_msve,
-                     mean_true_msve + std_true_msve, alpha=0.2)
-    plt.plot(xs, mean_tf_msve, label='Transformer MSVE')
-    plt.fill_between(xs, mean_tf_msve - std_tf_msve,
-                     mean_tf_msve + std_tf_msve, alpha=0.2)
-    plt.xlabel('# MDPs')
-    plt.ylabel('MSVE')
-    plt.title('MSVE vs # MDPs')
-    plt.legend()
-    plt.savefig(os.path.join(error_dir, 'msve.png'), dpi=300)
-    plt.close()
+        plt.figure()
+        plt.plot(xs, mean_true_msve, label='True')
+        plt.fill_between(xs, mean_true_msve - std_true_msve,
+                         mean_true_msve + std_true_msve, alpha=0.2)
+        plt.plot(xs, mean_tf_msve, label='TF')
+        plt.fill_between(xs, mean_tf_msve - std_tf_msve,
+                         mean_tf_msve + std_tf_msve, alpha=0.2)
+        plt.plot(xs, mean_tf_msve_hard, label='TF Hard')
+        plt.fill_between(xs, mean_tf_msve_hard - std_tf_msve_hard,
+                         mean_tf_msve_hard + std_tf_msve_hard, alpha=0.2)
+        plt.xlabel('# MDPs')
+        plt.ylabel('MSVE')
+        plt.title('MSVE vs # MDPs')
+        plt.legend()
+        plt.savefig(os.path.join(error_dir, 'msve.png'), dpi=300)
+        plt.close()
+    else:  # we can only compute msve for nonlinear TF
+        mean_tf_msve = np.mean(error_log['transformer msve'], axis=0)
+        std_tf_msve = np.std(error_log['transformer msve'], axis=0)
+        plt.figure()
+        plt.plot(xs, mean_tf_msve, label='Transformer MSVE')
+        plt.fill_between(xs, mean_tf_msve - std_tf_msve,
+                         mean_tf_msve + std_tf_msve, alpha=0.2)
+        plt.xlabel('# MDPs')
+        plt.ylabel('MSVE')
+        plt.title('MSVE vs # MDPs')
+        plt.legend()
+        plt.savefig(os.path.join(error_dir, 'msve.png'), dpi=300)
+        plt.close()
 
-    # MSPBE
-    mean_tf_mspbe = np.mean(error_log['transformer mspbe'], axis=0)
-    std_tf_mspbe = np.std(error_log['transformer mspbe'], axis=0)
-    plt.figure()
-    plt.plot(xs, mean_tf_mspbe, label='TF')
-    plt.fill_between(xs, mean_tf_mspbe - std_tf_mspbe,
-                     mean_tf_mspbe + std_tf_mspbe, alpha=0.2)
-    plt.xlabel('# MDPs')
-    plt.ylabel('MSPBE')
-    plt.ylim(0)
-    plt.title(f"TF (mode={params['mode']} L={params['l']}) MSPBE")
-    plt.legend()
-    plt.savefig(os.path.join(error_dir, 'mspbe.png'), dpi=300)
-    plt.close()
+    if params['linear']:  # MSPBE only computable for linear TF
+        # MSPBE
+        mean_tf_mspbe = np.mean(error_log['transformer mspbe'], axis=0)
+        std_tf_mspbe = np.std(error_log['transformer mspbe'], axis=0)
+        mean_tf_mspbe_hard = np.mean(
+            error_log['transformer mspbe hard'], axis=0)
+        std_tf_mspbe_hard = np.std(error_log['transformer mspbe hard'], axis=0)
+        plt.figure()
+        plt.plot(xs, mean_tf_mspbe, label='TF')
+        plt.fill_between(xs, mean_tf_mspbe - std_tf_mspbe,
+                         mean_tf_mspbe + std_tf_mspbe, alpha=0.2)
+        plt.plot(xs, mean_tf_mspbe_hard, label='TF Hard')
+        plt.fill_between(xs, mean_tf_mspbe_hard - std_tf_mspbe_hard,
+                         mean_tf_mspbe_hard + std_tf_mspbe_hard, alpha=0.2)
+        plt.xlabel('# MDPs')
+        plt.ylabel('MSPBE')
+        plt.ylim(0)
+        plt.title(f"TF (mode={params['mode']} L={params['l']}) MSPBE")
+        plt.legend()
+        plt.savefig(os.path.join(error_dir, 'mspbe.png'), dpi=300)
+        plt.close()
 
-    # TF weight and TD weight comparison
-    mean_cos_sim = np.mean(error_log['implicit w_tf and w_td cos sim'], axis=0)
-    std_cos_sim = np.std(error_log['implicit w_tf and w_td cos sim'], axis=0)
-    mean_weight_diff = np.mean(error_log['w_tf w_td diff l2'], axis=0)
-    std_weight_diff = np.std(error_log['w_tf w_td diff l2'], axis=0)
-    plt.figure()
-    plt.plot(xs, mean_cos_sim, label='Cosine Similarity')
-    plt.fill_between(xs, mean_cos_sim - std_cos_sim,
-                     mean_cos_sim + std_cos_sim, alpha=0.2)
-    plt.plot(xs, mean_weight_diff, label='L2 Norm Weight Difference')
-    plt.fill_between(xs, mean_weight_diff - std_weight_diff,
-                     mean_weight_diff + std_weight_diff, alpha=0.2)
-    plt.fill_between(xs, mean_cos_sim - std_cos_sim,
-                     mean_cos_sim + std_cos_sim, alpha=0.2)
-    plt.xlabel('# MDPs')
-    plt.title('Transformer Implicit weight and l-step TD weight Cosine Similarity')
-    plt.legend()
-    plt.savefig(os.path.join(error_dir, 'tf_td_weight_comparison.png'), dpi=300)
-    plt.close()
+    if params['linear']:
+        # Sensitivity
+        mean_sen_cos_sim = np.mean(error_log['sensitivity cos sim'], axis=0)
+        std_sen_cos_sim = np.std(error_log['sensitivity cos sim'], axis=0)
+        mean_sen_l2_dist = np.mean(error_log['sensitivity l2 dist'], axis=0)
+        std_sen_l2_dist = np.std(error_log['sensitivity l2 dist'], axis=0)
+
+        plt.figure()
+        plt.plot(xs, mean_sen_cos_sim, label='Cosine Similarity')
+        plt.fill_between(xs, mean_sen_cos_sim - std_sen_cos_sim,
+                         mean_sen_cos_sim + std_sen_cos_sim, alpha=0.2)
+        plt.plot(xs, mean_sen_l2_dist, label='L2 Distance')
+        plt.fill_between(xs, mean_sen_l2_dist - std_sen_l2_dist,
+                         mean_sen_l2_dist + std_sen_l2_dist, alpha=0.2)
+        plt.xlabel('# MDPs')
+        plt.title('Sensitivity Analysis')
+        plt.legend()
+        plt.savefig(os.path.join(error_dir, 'sensitivity.png'), dpi=300)
+        plt.close()
+    else:
+        mean_zo_cos_sim = np.mean(error_log['zero order cos sim'], axis=0)
+        std_zo_cos_sim = np.std(error_log['zero order cos sim'], axis=0)
+        mean_zo_l2_dist = np.mean(error_log['zero order l2 dist'], axis=0)
+        std_zo_l2_dist = np.std(error_log['zero order l2 dist'], axis=0)
+        mean_fo_cos_sim = np.mean(error_log['first order cos sim'], axis=0)
+        std_fo_cos_sim = np.std(error_log['first order cos sim'], axis=0)
+        mean_fo_l2_dist = np.mean(error_log['first order l2 dist'], axis=0)
+        std_fo_l2_dist = np.std(error_log['first order l2 dist'], axis=0)
+
+        plt.figure()
+        plt.plot(xs, mean_zo_cos_sim, label='Zero Order Cosine Similarity')
+        plt.fill_between(xs, mean_zo_cos_sim - std_zo_cos_sim,
+                         mean_zo_cos_sim + std_zo_cos_sim, alpha=0.2)
+        plt.plot(xs, mean_zo_l2_dist, label='Zero Order L2 Distance')
+        plt.fill_between(xs, mean_zo_l2_dist - std_zo_l2_dist,
+                         mean_zo_l2_dist + std_zo_l2_dist, alpha=0.2)
+        plt.xlabel('# MDPs')
+        plt.title('Zero Order Comparison')
+        plt.legend()
+        plt.savefig(os.path.join(error_dir, 'zero_order.png'), dpi=300)
+        plt.close()
+
+        plt.figure()
+        plt.plot(xs, mean_fo_cos_sim, label='First Order Cosine Similarity')
+        plt.fill_between(xs, mean_fo_cos_sim - std_fo_cos_sim,
+                         mean_fo_cos_sim + std_fo_cos_sim, alpha=0.2)
+        plt.plot(xs, mean_fo_l2_dist, label='First Order L2 Distance')
+        plt.fill_between(xs, mean_fo_l2_dist - std_fo_l2_dist,
+                         mean_fo_l2_dist + std_fo_l2_dist, alpha=0.2)
+        plt.xlabel('# MDPs')
+        plt.title('First Order Comparison')
+        plt.legend()
+        plt.savefig(os.path.join(error_dir, 'first_order.png'), dpi=300)
+        plt.close()
 
 
 def plot_attention_params(xs: np.ndarray,
@@ -292,6 +395,16 @@ def plot_attention_params(xs: np.ndarray,
         plt.savefig(save_path, dpi=300)
         plt.close(fig)
         paths.append(save_path)
+
+    alphas = params['alpha']
+    fig = plt.figure(figsize=(10, 5))
+    plt.plot(xs, alphas)
+    plt.xlabel('# MDPs')
+    plt.ylabel('Alpha')
+    plt.title('Alpha vs # MDPs')
+    plt.savefig(os.path.join(attn_dir, 'alpha.png'))
+    plt.close(fig)
+
     return paths
 
 
@@ -353,7 +466,8 @@ def plot_weight_metrics(xs: np.ndarray,
         for key, metric in P_metrics.items():
             # if sequential, add layer number to the label and title
             if params['mode'] == 'sequential':
-                plt.title(f'TF (mode={params["mode"]}, L={params["l"]}) $P_{i}$ Metrics')
+                plt.title(
+                    f'TF (mode={params["mode"]}, L={params["l"]}) $P_{i}$ Metrics')
                 if key == 'norm_diff':
                     label = (r'$||P^{TF}_{%s} - P^{TD}||_2$' % (str(i)))
                 elif key == 'bottom_right':
@@ -361,7 +475,8 @@ def plot_weight_metrics(xs: np.ndarray,
                 elif key == 'avg_abs_all_others':
                     label = 'Avg Abs Others'
             else:
-                plt.title(f'TF (mode={params["mode"]}, L={params["l"]}) $P$ Metrics')
+                plt.title(
+                    f'TF (mode={params["mode"]}, L={params["l"]}) $P$ Metrics')
                 if key == 'norm_diff':
                     label = (r'$||P^{TF} - P^{TD}||_2$')
                 elif key == 'bottom_right':
