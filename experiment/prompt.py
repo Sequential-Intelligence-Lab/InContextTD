@@ -134,10 +134,24 @@ class MDPPrompt:
 
     def query(self):
         return self._query
+
+    def set_query(self, query: torch.Tensor):
+        query = query.reshape(self.d, 1)
+        self._query = query
+
+    def enable_query_grad(self):
+        self._query.requires_grad_(True)
+
+    def query_grad(self):
+        assert self._query.grad is not None, "no gradient associated with the query"
+        return self._query.grad.reshape((self.d, 1))
     
+    def zero_query_grad(self):
+        self._query.grad = None
+
     def get_feature_mat(self):
         return torch.from_numpy(self.feature_fun.phi)
-    
+
     def z(self):
         query_col = torch.concat(
             [self._query, torch.zeros((self.d+1, 1))], dim=0)
@@ -160,7 +174,7 @@ class MDPPrompt:
                 u += td_error * (self.phi[:, [j]] - self.phi_prime[:, [j]])
             else:
                 u += td_error * self.phi[:, [j]]
-        u *=  lr/self.n
+        u *= lr/self.n
         if C:
             u = C @ u  # apply conditioning matrix
         new_w = w + u
@@ -209,7 +223,6 @@ if __name__ == '__main__':
     n = 6
     eval_len = 3
     gamma = 0.9
-
 
     prompt_gen = MDPPromptGenerator(s, d, n, gamma)
     prompt_gen.reset_feat()
