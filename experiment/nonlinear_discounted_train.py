@@ -12,7 +12,7 @@ from experiment.plotter import (generate_attention_params_gif, load_data,
                                 plot_attention_params, plot_mean_attn_params,
                                 plot_multiple_runs)
 from experiment.prompt import MDPPrompt, MDPPromptGenerator
-from experiment.utils import (compute_msve, in_context_learning_rate, set_seed)
+from experiment.utils import (compute_msve, solve_msve_weight, set_seed)
 
 
 def _init_log() -> dict:
@@ -20,6 +20,9 @@ def _init_log() -> dict:
            'mstde': [],
            'true msve': [],
            'transformer msve': [],
+           'implicit w_tf and w_td cos sim': [],
+           'fo cos dist': [],
+           'value dist': [],
            'P': [],
            'Q': []
            }
@@ -120,6 +123,13 @@ def train(d: int,
             tf_msve = compute_msve(v_tf, true_v, steady_d)
             log['transformer msve'].append(tf_msve)
 
+            cos_sim = linear_model_cos_similarity(tf, prompt)
+            log['implicit w_tf and w_td cos sim'].append(cos_sim) 
+
+            fo_cos_dist, value_dist = first_order_dist(tf, prompt)
+            log['fo cos dist'].append(fo_cos_dist)
+            log['value dist'].append(value_dist)
+
 
             if mode=='auto':
                 log['P'].append([tf.attn.P.detach().numpy().copy()])
@@ -155,30 +165,55 @@ def train(d: int,
             
             
 # computes the cosine similarity between the tf forward pass and TD
-def compare_tf_td_weight( tf:Transformer,  prompt: MDPPrompt):
+def linear_model_cos_similarity( tf:Transformer,  prompt: MDPPrompt):
     '''
     computes the cosine similarity between the transformer forward pass implicit weight and the TD update weight 
     tf: an instance of LinearTransformer
     prompt: an instance of MDPPrompt
     '''
-    # transformer should perform l steps of TD
-    # extract the implicit weight from the transformer
-    implicit_w_tf = tf.manual_weight_extraction(prompt.context(), tf.d).detach().numpy()
+    # make another transformer with 1 layer and copy over the attention weights
+    new_tf = Transformer(tf.d, tf.n, 1, tf.lmbd, mode='auto')
+    new_tf.attn.load_state_dict(tf.attn.state_dict())
+    new_tf.eval()
+
+    phi = prompt.get_feature_mat()
+    v_tf = new_tf.fit_value_func(prompt.context(), phi).detach().numpy().reshape((-1, 1))
+    w_tf = solve_msve_weight(prompt.mdp.steady_d, phi.numpy(), v_tf)
+    
+
     w_td = torch.zeros((tf.d, 1))
-    # unroll td for the same number of steps as the transformer
-    if tf.mode == 'auto':
-        # P and Q could differ from the hardcoded P and Q values by some constant learning rate
-        # We rescale the learning rate for td accordingly
-        lr = in_context_learning_rate(tf.attn.P.detach().numpy(), tf.attn.Q.detach().numpy(), tf.d)
-        for layer in range(tf.l):
-            w_td, _ = prompt.td_update(w_td, lr = lr)
-    else: # sequential
-        for layer in tf.layers:
-            lr = in_context_learning_rate(layer.P.detach().numpy(), layer.Q.detach().numpy(), tf.d)
-            w_td, _ = prompt.td_update(w_td, lr = lr)
-    w_td = w_td.numpy()
-    cosine_similarity = w_td.T @ implicit_w_tf / (np.linalg.norm(w_td) * np.linalg.norm(implicit_w_tf))
-    return cosine_similarity.item(), np.linalg.norm(w_td-implicit_w_tf)
+    w_td = prompt.td_update(w_td)[0].numpy()
+    cos_sim: np.ndarray = w_tf.T @ w_td / (np.linalg.norm(w_tf) * np.linalg.norm(w_td))
+    return cos_sim.item()
+
+
+def first_order_dist(tf: Transformer, prompt: MDPPrompt):
+    new_tf = Transformer(tf.d, tf.n, 1, tf.lmbd, mode='auto')
+    new_tf.attn.load_state_dict(tf.attn.state_dict())
+    new_tf.eval()
+
+    phi = prompt.get_feature_mat()
+    ns, d = phi.shape
+    v_tf = new_tf.fit_value_func(prompt.context(), phi).detach().reshape((-1, 1))
+
+    w_td = torch.zeros((tf.d, 1))
+    w_td = prompt.td_update(w_td)[0]
+
+    cos_dist = 0.0
+    for i in range(ns - 1):
+        for j in range(i + 1, ns):
+            phi_i = phi[i].reshape((-1, 1))
+            phi_j = phi[j].reshape((-1, 1))
+            phi_mid = (phi_i + phi_j) / 2
+            prompt.set_query(phi_mid)
+            prompt.enable_query_grad()
+            v_mid = new_tf.pred_v(prompt.z())
+            v_mid.backward()
+            grad_mid = prompt.query_grad()
+            cos_dist += (1.0 - grad_mid.T @ w_td / (torch.norm(grad_mid) * torch.norm(w_td))).item()
+            prompt.zero_query_grad()
+    
+    return cos_dist / (ns * (ns - 1) / 2), torch.norm(phi @ w_td - v_tf).item()
 
 if __name__ == '__main__':
     from plotter import (compute_weight_metrics, plot_error_data,
@@ -197,7 +232,7 @@ if __name__ == '__main__':
         data_dir = os.path.join(save_dir, f'seed_{seed}')
         data_dirs.append(data_dir)
         train(d, s, n, l, lmbd=0.0, mode=mode,
-              n_mdps=2_000, log_interval=10, 
+              n_mdps=500, log_interval=20, 
               random_seed=seed, save_dir=data_dir,
               gamma=gamma)
         log, hyperparams = load_data(data_dir)
