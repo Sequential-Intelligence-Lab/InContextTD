@@ -41,6 +41,8 @@ def process_log(log: dict) -> Tuple[np.ndarray, dict, dict]:
                 'transformer msve',
                 'transformer mspbe',
                 'implicit w_tf and w_td cos sim',
+                'fo cos dist',
+                'value dist',
                 'w_tf w_td diff l2'):
         if key in log:
             error_log[key] = np.expand_dims(log[key], axis=0)
@@ -268,6 +270,35 @@ def plot_error_data(xs: np.ndarray,
         plt.title('Transformer Implicit weight and l-step TD weight Cosine Similarity')
         plt.legend()
         plt.savefig(os.path.join(error_dir, 'tf_td_weight_comparison.png'), dpi=300)
+        plt.close()
+    else:
+        mean_cos_sim = np.mean(error_log['implicit w_tf and w_td cos sim'], axis=0)
+        std_cos_sim = np.std(error_log['implicit w_tf and w_td cos sim'], axis=0)
+        plt.figure()
+        plt.plot(xs, mean_cos_sim, label='Cosine Similarity')
+        plt.fill_between(xs, mean_cos_sim - std_cos_sim,
+                        mean_cos_sim + std_cos_sim, alpha=0.2)
+        plt.xlabel('# MDPs')
+        plt.title('First-Order TF and 1-Step Batch TD Weight Cosine Similarity')
+        plt.legend()
+        plt.savefig(os.path.join(error_dir, 'tf_td_weight_comparison.png'), dpi=300)
+        plt.close()
+
+        mean_fo_cos_dist = np.mean(error_log['fo cos dist'], axis=0)
+        std_fo_cos_dist = np.std(error_log['fo cos dist'], axis=0)
+        mean_value_dist = np.mean(error_log['value dist'], axis=0)
+        std_value_dist = np.std(error_log['value dist'], axis=0)
+        plt.figure()
+        plt.plot(xs, mean_fo_cos_dist, label='First Order Cos Dist')
+        plt.fill_between(xs, mean_fo_cos_dist - std_fo_cos_dist,
+                        mean_fo_cos_dist + std_fo_cos_dist, alpha=0.2)
+        plt.plot(xs, mean_value_dist, label='Value Dist')
+        plt.fill_between(xs, mean_value_dist - std_value_dist,
+                        mean_value_dist + std_value_dist, alpha=0.2)
+        plt.xlabel('# MDPs')
+        plt.title('First-Order TF and 1-Step Batch TD Weight Cosine Distance')
+        plt.legend()
+        plt.savefig(os.path.join(error_dir, 'fo_cos_dist.png'), dpi=300)
         plt.close()
 
 
