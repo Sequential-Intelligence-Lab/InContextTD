@@ -47,7 +47,11 @@ def process_log(log: dict) -> Tuple[np.ndarray, dict, dict]:
                 'transformer mspbe',
                 'transformer mspbe hard',
                 'sensitivity cos sim',
-                'sensitivity l2 dist'):
+                'sensitivity l2 dist',
+                'zero order cos sim',
+                'zero order l2 dist',
+                'first order cos sim',
+                'first order l2 dist'):
         if key in log:
             error_log[key] = np.expand_dims(log[key], axis=0)
 
@@ -260,7 +264,7 @@ def plot_error_data(xs: np.ndarray,
         plt.legend()
         plt.savefig(os.path.join(error_dir, 'msve.png'), dpi=300)
         plt.close()
-    else:
+    else:  # we can only compute msve for nonlinear TF
         mean_tf_msve = np.mean(error_log['transformer msve'], axis=0)
         std_tf_msve = np.std(error_log['transformer msve'], axis=0)
         plt.figure()
@@ -274,7 +278,7 @@ def plot_error_data(xs: np.ndarray,
         plt.savefig(os.path.join(error_dir, 'msve.png'), dpi=300)
         plt.close()
 
-    if params['linear']:
+    if params['linear']:  # MSPBE only computable for linear TF
         # MSPBE
         mean_tf_mspbe = np.mean(error_log['transformer mspbe'], axis=0)
         std_tf_mspbe = np.std(error_log['transformer mspbe'], axis=0)
@@ -306,14 +310,49 @@ def plot_error_data(xs: np.ndarray,
         plt.figure()
         plt.plot(xs, mean_sen_cos_sim, label='Cosine Similarity')
         plt.fill_between(xs, mean_sen_cos_sim - std_sen_cos_sim,
-                        mean_sen_cos_sim + std_sen_cos_sim, alpha=0.2)
+                         mean_sen_cos_sim + std_sen_cos_sim, alpha=0.2)
         plt.plot(xs, mean_sen_l2_dist, label='L2 Distance')
         plt.fill_between(xs, mean_sen_l2_dist - std_sen_l2_dist,
-                        mean_sen_l2_dist + std_sen_l2_dist, alpha=0.2)
+                         mean_sen_l2_dist + std_sen_l2_dist, alpha=0.2)
         plt.xlabel('# MDPs')
         plt.title('Sensitivity Analysis')
         plt.legend()
         plt.savefig(os.path.join(error_dir, 'sensitivity.png'), dpi=300)
+        plt.close()
+    else:
+        mean_zo_cos_sim = np.mean(error_log['zero order cos sim'], axis=0)
+        std_zo_cos_sim = np.std(error_log['zero order cos sim'], axis=0)
+        mean_zo_l2_dist = np.mean(error_log['zero order l2 dist'], axis=0)
+        std_zo_l2_dist = np.std(error_log['zero order l2 dist'], axis=0)
+        mean_fo_cos_sim = np.mean(error_log['first order cos sim'], axis=0)
+        std_fo_cos_sim = np.std(error_log['first order cos sim'], axis=0)
+        mean_fo_l2_dist = np.mean(error_log['first order l2 dist'], axis=0)
+        std_fo_l2_dist = np.std(error_log['first order l2 dist'], axis=0)
+
+        plt.figure()
+        plt.plot(xs, mean_zo_cos_sim, label='Zero Order Cosine Similarity')
+        plt.fill_between(xs, mean_zo_cos_sim - std_zo_cos_sim,
+                         mean_zo_cos_sim + std_zo_cos_sim, alpha=0.2)
+        plt.plot(xs, mean_zo_l2_dist, label='Zero Order L2 Distance')
+        plt.fill_between(xs, mean_zo_l2_dist - std_zo_l2_dist,
+                         mean_zo_l2_dist + std_zo_l2_dist, alpha=0.2)
+        plt.xlabel('# MDPs')
+        plt.title('Zero Order Comparison')
+        plt.legend()
+        plt.savefig(os.path.join(error_dir, 'zero_order.png'), dpi=300)
+        plt.close()
+
+        plt.figure()
+        plt.plot(xs, mean_fo_cos_sim, label='First Order Cosine Similarity')
+        plt.fill_between(xs, mean_fo_cos_sim - std_fo_cos_sim,
+                         mean_fo_cos_sim + std_fo_cos_sim, alpha=0.2)
+        plt.plot(xs, mean_fo_l2_dist, label='First Order L2 Distance')
+        plt.fill_between(xs, mean_fo_l2_dist - std_fo_l2_dist,
+                         mean_fo_l2_dist + std_fo_l2_dist, alpha=0.2)
+        plt.xlabel('# MDPs')
+        plt.title('First Order Comparison')
+        plt.legend()
+        plt.savefig(os.path.join(error_dir, 'first_order.png'), dpi=300)
         plt.close()
 
 
