@@ -266,38 +266,25 @@ class HardLinearTransformer(nn.Module):
                  d: int,
                  n: int,
                  l: int,
-                 lmbd: float = 0.0,
-                 mode='auto'):
+                 lmbd: float = 0.0):
         '''
         d: feature dimension
         n: context length
         l: number of layers
         lmbd: eligibility trace decay
-        mode: 'auto' or 'sequential'
         '''
         super(HardLinearTransformer, self).__init__()
         self.d = d
         self.n = n
         self.l = l
-        self.mode = mode
-        if mode == 'auto':
-            attn = HardLinearAttention(d, n, lmbd)
-            self.attn = attn
-        elif mode == 'sequential':
-            self.layers = nn.ModuleList([HardLinearAttention(d, n, lmbd) for _ in range(l)])
-        else:
-            raise ValueError('mode must be either auto or sequential')
+        self.attn = HardLinearAttention(d, n, lmbd)
 
     def forward(self, Z):
         '''
         Z: prompt of shape (2*d+1, n+1)
         '''
-        if self.mode == 'auto':
-            for _ in range(self.l):
-                Z = self.attn(Z)
-        else:
-            for attn in self.layers:
-                Z = attn(Z)
+        for _ in range(self.l):
+            Z = self.attn(Z)
 
         return Z
 
