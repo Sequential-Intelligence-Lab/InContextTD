@@ -141,6 +141,9 @@ class MDPPrompt:
 
     def enable_query_grad(self):
         self._query.requires_grad_(True)
+    
+    def disable_query_grad(self):
+        self._query.requires_grad_(False)
 
     def query_grad(self):
         assert self._query.grad is not None, "no gradient associated with the query"
