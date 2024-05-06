@@ -170,6 +170,7 @@ class Transformer(nn.Module):
         self.d = d
         self.n = n
         self.l = l
+        self.lmbd = lmbd
         self.mode = mode
         if mode == 'auto':
             attn = Attention(d, n, lmbd)
