@@ -1,6 +1,7 @@
 import numpy as np
 import scipy as sp
 import torch
+from typing import Union
 
 
 def stack_four(A: torch.Tensor, B: torch.Tensor,
@@ -212,6 +213,23 @@ def in_context_learning_rate(P: np.ndarray,
 
     rate = c_P * c_Q
     return rate
+
+
+def cos_sim(v1: Union[torch.Tensor, np.ndarray],
+             v2: Union[torch.Tensor, np.ndarray]) -> float:
+    '''
+    v1: vector 1
+    v2: vector 2
+    returns cosine distance between v1 and v2
+    '''
+    if isinstance(v1, torch.Tensor):
+        v1 = v1.detach().numpy()
+    if isinstance(v2, torch.Tensor):
+        v2 = v2.detach().numpy()
+
+    v1 = v1.flatten()
+    v2 = v2.flatten()
+    return np.dot(v1, v2) / (np.linalg.norm(v1) * np.linalg.norm(v2))
 
 
 if __name__ == '__main__':
