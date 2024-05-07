@@ -46,12 +46,8 @@ def process_log(log: dict) -> Tuple[np.ndarray, dict, dict]:
                 'transformer msve hard',
                 'transformer mspbe',
                 'transformer mspbe hard',
-                'sensitivity cos sim',
-                'sensitivity l2 dist',
                 'zero order cos sim',
-                'zero order l2 dist',
-                'first order cos sim',
-                'first order l2 dist'):
+                'first order cos sim',):
         if key in log:
             error_log[key] = np.expand_dims(log[key], axis=0)
 
@@ -123,7 +119,7 @@ def plot_mean_attn_params(data_dirs: List[str],
     Qs = []
     alphas = []
     for data_dir in data_dirs:
-        log, _ = load_data(data_dir)
+        log, hypers = load_data(data_dir)
         xs, _, attn_params = process_log(log)
         Ps.append(attn_params['P'][log_step])  # shape (l, 2d+1, 2d+1)
         Qs.append(attn_params['Q'][log_step])  # shape (l, 2d+1, 2d+1)
@@ -141,9 +137,13 @@ def plot_mean_attn_params(data_dirs: List[str],
         Q = scale(Q)
         fig, axs = plt.subplots(nrows=1, ncols=2, figsize=(10, 5), sharey=True)
         cax1 = axs[0].matshow(P, vmin=-1, vmax=1)
-        axs[0].set_title(f'Mean Layer {l+1} P Matrix at MDP {step}')
+        if hypers['mode'] == 'sequential':
+            axs[0].set_title(f'Mean Layer {l+1} P Matrix at MDP {step}', fontsize=16)
+            axs[1].set_title(f'Mean Layer {l+1} Q Matrix at MDP {step}', fontsize=16)
+        else:
+            axs[0].set_title(f'Mean P Matrix at MDP {step}', fontsize=16)
+            axs[1].set_title(f'Mean Q Matrix at MDP {step}', fontsize=16)
         axs[1].matshow(Q, vmin=-1, vmax=1)
-        axs[1].set_title(f'Mean Layer {l+1} Q Matrix at MDP {step}')
         fig.colorbar(cax1, ax=axs, orientation='vertical')
         axs[0].tick_params(axis='both', which='both',
                            bottom=False, top=False,
@@ -286,74 +286,40 @@ def plot_error_data(xs: np.ndarray,
             error_log['transformer mspbe hard'], axis=0)
         std_tf_mspbe_hard = np.std(error_log['transformer mspbe hard'], axis=0)
         plt.figure()
-        plt.plot(xs, mean_tf_mspbe, label='TF')
+        plt.plot(xs, mean_tf_mspbe, label='Learned TF')
         plt.fill_between(xs, mean_tf_mspbe - std_tf_mspbe,
                          mean_tf_mspbe + std_tf_mspbe, alpha=0.2)
-        plt.plot(xs, mean_tf_mspbe_hard, label='TF Hard')
+        plt.plot(xs, mean_tf_mspbe_hard, label='Batch TD TF')
         plt.fill_between(xs, mean_tf_mspbe_hard - std_tf_mspbe_hard,
                          mean_tf_mspbe_hard + std_tf_mspbe_hard, alpha=0.2)
         plt.xlabel('# MDPs')
         plt.ylabel('MSPBE')
         plt.ylim(0)
-        plt.title(f"TF (mode={params['mode']} L={params['l']}) MSPBE")
-        plt.legend()
+        plt.title(f"TF(mode={params['mode']} L={params['l']}, vf_rep={params['sample_weight']}) MSPBE")
+        plt.legend(frameon=True, framealpha=0.8,
+                            fontsize='small').set_alpha(0.5)
         plt.savefig(os.path.join(error_dir, 'mspbe.png'), dpi=300)
         plt.close()
 
-    if params['linear']:
-        # Sensitivity
-        mean_sen_cos_sim = np.mean(error_log['sensitivity cos sim'], axis=0)
-        std_sen_cos_sim = np.std(error_log['sensitivity cos sim'], axis=0)
-        mean_sen_l2_dist = np.mean(error_log['sensitivity l2 dist'], axis=0)
-        std_sen_l2_dist = np.std(error_log['sensitivity l2 dist'], axis=0)
 
-        plt.figure()
-        plt.plot(xs, mean_sen_cos_sim, label='Cosine Similarity')
-        plt.fill_between(xs, mean_sen_cos_sim - std_sen_cos_sim,
-                         mean_sen_cos_sim + std_sen_cos_sim, alpha=0.2)
-        plt.plot(xs, mean_sen_l2_dist, label='L2 Distance')
-        plt.fill_between(xs, mean_sen_l2_dist - std_sen_l2_dist,
-                         mean_sen_l2_dist + std_sen_l2_dist, alpha=0.2)
-        plt.xlabel('# MDPs')
-        plt.title('Sensitivity Analysis')
-        plt.legend()
-        plt.savefig(os.path.join(error_dir, 'sensitivity.png'), dpi=300)
-        plt.close()
-    else:
-        mean_zo_cos_sim = np.mean(error_log['zero order cos sim'], axis=0)
-        std_zo_cos_sim = np.std(error_log['zero order cos sim'], axis=0)
-        mean_zo_l2_dist = np.mean(error_log['zero order l2 dist'], axis=0)
-        std_zo_l2_dist = np.std(error_log['zero order l2 dist'], axis=0)
-        mean_fo_cos_sim = np.mean(error_log['first order cos sim'], axis=0)
-        std_fo_cos_sim = np.std(error_log['first order cos sim'], axis=0)
-        mean_fo_l2_dist = np.mean(error_log['first order l2 dist'], axis=0)
-        std_fo_l2_dist = np.std(error_log['first order l2 dist'], axis=0)
+    mean_zo_cos_sim = np.mean(error_log['zero order cos sim'], axis=0)
+    std_zo_cos_sim = np.std(error_log['zero order cos sim'], axis=0)
+    mean_fo_cos_sim = np.mean(error_log['first order cos sim'], axis=0)
+    std_fo_cos_sim = np.std(error_log['first order cos sim'], axis=0)
 
-        plt.figure()
-        plt.plot(xs, mean_zo_cos_sim, label='Zero Order Cosine Similarity')
-        plt.fill_between(xs, mean_zo_cos_sim - std_zo_cos_sim,
-                         mean_zo_cos_sim + std_zo_cos_sim, alpha=0.2)
-        plt.plot(xs, mean_zo_l2_dist, label='Zero Order L2 Distance')
-        plt.fill_between(xs, mean_zo_l2_dist - std_zo_l2_dist,
-                         mean_zo_l2_dist + std_zo_l2_dist, alpha=0.2)
-        plt.xlabel('# MDPs')
-        plt.title('Zero Order Comparison')
-        plt.legend()
-        plt.savefig(os.path.join(error_dir, 'zero_order.png'), dpi=300)
-        plt.close()
-
-        plt.figure()
-        plt.plot(xs, mean_fo_cos_sim, label='First Order Cosine Similarity')
-        plt.fill_between(xs, mean_fo_cos_sim - std_fo_cos_sim,
-                         mean_fo_cos_sim + std_fo_cos_sim, alpha=0.2)
-        plt.plot(xs, mean_fo_l2_dist, label='First Order L2 Distance')
-        plt.fill_between(xs, mean_fo_l2_dist - std_fo_l2_dist,
-                         mean_fo_l2_dist + std_fo_l2_dist, alpha=0.2)
-        plt.xlabel('# MDPs')
-        plt.title('First Order Comparison')
-        plt.legend()
-        plt.savefig(os.path.join(error_dir, 'first_order.png'), dpi=300)
-        plt.close()
+    plt.figure()
+    plt.title(f"TF(mode={params['mode']},L={params['l']},vf_rep={params['sample_weight']}) vs Batch TD TF")
+    plt.xlabel('# MDPs')
+    plt.ylabel('Cosine Similarity')
+    plt.plot(xs, mean_zo_cos_sim, label='0th Order Approx')
+    plt.fill_between(xs, mean_zo_cos_sim - std_zo_cos_sim,
+                     mean_zo_cos_sim + std_zo_cos_sim, lw=0, alpha=0.2)
+    plt.plot(xs, mean_fo_cos_sim, label='1st Order Approx')
+    plt.fill_between(xs, mean_fo_cos_sim - std_fo_cos_sim,
+                     mean_fo_cos_sim + std_fo_cos_sim, lw=0, alpha=0.2)
+    plt.legend()
+    plt.savefig(os.path.join(error_dir, 'cos_similarity.png'), dpi=300)
+    plt.close()
 
 
 def plot_attention_params(xs: np.ndarray,
@@ -642,8 +608,10 @@ def compute_weight_metrics(attn_params: dict,
 
 if __name__ == '__main__':
     runs_directory = os.path.join(
-        './logs', 'discounted_train', '2024-04-25-15-38-49')
+        './logs', 'linear_discounted_train', '2024-05-07-11-57-05')
     runs_to_plot = [run for run in os.listdir(
         runs_directory) if run.startswith('seed')]
     plot_multiple_runs([os.path.join(runs_directory, run)
                        for run in runs_to_plot], runs_directory)
+    plot_mean_attn_params([os.path.join(runs_directory, run)
+                            for run in runs_to_plot], runs_directory)
