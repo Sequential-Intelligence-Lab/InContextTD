@@ -222,6 +222,7 @@ if __name__ == '__main__':
     s = 10
     gamma = 0.9
     mode = 'auto'
+    sample_weight = False
     startTime = datetime.datetime.now()
     save_dir = os.path.join(
         './logs', "nonlinear_discounted_train", startTime.strftime("%Y-%m-%d-%H-%M-%S"))
@@ -230,9 +231,9 @@ if __name__ == '__main__':
         data_dir = os.path.join(save_dir, f'seed_{seed}')
         data_dirs.append(data_dir)
         train(d, s, n, l, lmbd=0.0, mode=mode,
-              n_mdps=20, log_interval=10,
+              n_mdps=2_000, log_interval=10,
               random_seed=seed, save_dir=data_dir,
-              gamma=gamma)
+              gamma=gamma, sample_weight=sample_weight)
         log, hyperparams = load_data(data_dir)
         xs, error_log, attn_params = process_log(log)
         l_tf = l if mode == 'sequential' else 1
