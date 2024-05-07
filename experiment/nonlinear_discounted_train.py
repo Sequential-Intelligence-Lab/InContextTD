@@ -12,7 +12,7 @@ from experiment.plotter import (generate_attention_params_gif, load_data,
                                 plot_attention_params, plot_mean_attn_params,
                                 plot_multiple_runs)
 from experiment.prompt import MDPPrompt, MDPPromptGenerator
-from experiment.utils import compute_msve, cos_sim, set_seed, solve_msve_weight
+from experiment.utils import compute_msve, cos_sim, set_seed, zero_order_comparison
 from MRP.mrp import MRP
 
 
@@ -147,15 +147,13 @@ def train(d: int,
             tf_msve = compute_msve(v_tf, true_v, steady_d)
             log['transformer msve'].append(tf_msve)
 
-            zo_cos_sim, zo_l2_dist = zero_order_comparison(v_tf, w_td,
+            zo_cos_sim= zero_order_comparison(v_tf, w_td,
                                                            Phi, steady_d)
             log['zero order cos sim'].append(zo_cos_sim)
-            log['zero order l2 dist'].append(zo_l2_dist)
 
-            fo_cos_sim, fo_l2_dist = first_order_comparison(tf, v_tf,
-                                                            w_td, prompt)
+            fo_cos_sim = first_order_comparison(tf, tf_hard,
+                                                            prompt)
             log['first order cos sim'].append(fo_cos_sim)
-            log['first order l2 dist'].append(fo_l2_dist)
 
             if mode == 'auto':
                 log['P'].append([tf.attn.P.detach().numpy().copy()])
@@ -191,25 +189,31 @@ def train(d: int,
     with open(os.path.join(save_dir, 'params.json'), 'w') as f:
         json.dump(hyperparameters, f)
 
-
-def zero_order_comparison(v_tf: np.ndarray,
-                          w_td: np.ndarray,
-                          Phi: np.ndarray,
-                          steady_dist: np.ndarray):
+def first_order_comparison(tf: Transformer,
+                           tf_hard: HardLinearTransformer,
+                           prompt: MDPPrompt):
     '''
     computes the cosine similarity and l2 distance
-    between the batch TD weight (with the fitted learning rate) 
-    and the weight of the best linear model that explaines v_tf
+    between the first order approximation of the batch TD transformer
+    and the non-linear transformer
     '''
-    w_tf = solve_msve_weight(steady_dist, Phi, v_tf)
-    return cos_sim(w_tf, w_td), np.linalg.norm(w_tf - w_td)
 
+    # TF approximation
+    prompt.enable_query_grad()
+    tf_v = tf.pred_v(prompt.z())
+    tf_v.backward()
+    tf_grad = prompt.query_grad().numpy()
+    prompt.zero_query_grad()
 
-def first_order_comparison(tf: Transformer,
-                           v_tf: np.ndarray,
-                           w_td: np.ndarray,
-                           prompt: MDPPrompt):
-    return 0.0, 0.0
+    # Hardcoded approximation
+    tf_v_hard = tf_hard.pred_v(prompt.z())
+    tf_v_hard.backward()
+    tf_grad_hard = prompt.query_grad().numpy()
+    prompt.disable_query_grad()
+
+    first_order_tf = np.concatenate([tf_grad.flatten(), [tf_v.item()]])
+    first_order_hard = np.concatenate([tf_grad_hard.flatten(), [tf_v_hard.item()]])
+    return cos_sim(first_order_tf, first_order_hard)
 
 
 if __name__ == '__main__':
@@ -217,12 +221,11 @@ if __name__ == '__main__':
                          plot_weight_metrics, process_log)
     from utils import get_hardcoded_P, get_hardcoded_Q
     d = 4
-    n = 50
+    n = 30
     l = 3
     s = 10
     gamma = 0.9
     mode = 'auto'
-    sample_weight = False
     startTime = datetime.datetime.now()
     save_dir = os.path.join(
         './logs', "nonlinear_discounted_train", startTime.strftime("%Y-%m-%d-%H-%M-%S"))
@@ -231,9 +234,9 @@ if __name__ == '__main__':
         data_dir = os.path.join(save_dir, f'seed_{seed}')
         data_dirs.append(data_dir)
         train(d, s, n, l, lmbd=0.0, mode=mode,
-              n_mdps=2_000, log_interval=10,
+              n_mdps=5000, log_interval=10,
               random_seed=seed, save_dir=data_dir,
-              gamma=gamma, sample_weight=sample_weight)
+              gamma=gamma, sample_weight=True)
         log, hyperparams = load_data(data_dir)
         xs, error_log, attn_params = process_log(log)
         l_tf = l if mode == 'sequential' else 1

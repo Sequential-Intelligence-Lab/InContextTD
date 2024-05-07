@@ -231,6 +231,18 @@ def cos_sim(v1: Union[torch.Tensor, np.ndarray],
     v2 = v2.flatten()
     return np.dot(v1, v2) / (np.linalg.norm(v1) * np.linalg.norm(v2))
 
+def zero_order_comparison(v_tf: np.ndarray,
+                          w_td: np.ndarray,
+                          Phi: np.ndarray,
+                          steady_dist: np.ndarray):
+    '''
+    computes the cosine similarity and l2 distance
+    between the batch TD weight (with the fitted learning rate) 
+    and the weight of the best linear model that explaines v_tf
+    '''
+    w_tf = solve_msve_weight(steady_dist, Phi, v_tf)
+    return cos_sim(w_tf, w_td)
+
 
 if __name__ == '__main__':
     from MRP.boyan import BoyanChain
