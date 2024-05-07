@@ -14,7 +14,7 @@ from experiment.plotter import (generate_attention_params_gif, load_data,
                                 plot_multiple_runs)
 from experiment.prompt import MDPPrompt, MDPPromptGenerator
 from experiment.utils import (compute_mspbe, compute_msve, cos_sim, set_seed,
-                              solve_mspbe_weight, solve_msve_weight)
+                              solve_mspbe_weight, solve_msve_weight, zero_order_comparison)
 from MRP.mrp import MRP
 
 
@@ -34,8 +34,8 @@ def _init_log() -> dict:
            'transformer mspbe hard': [],
            'P': [],
            'Q': [],
-           'sensitivity cos sim': [],
-           'sensitivity l2 dist': []
+           'zero order cos sim': [],
+           'first order cos sim': []
            }
     return log
 
@@ -188,9 +188,11 @@ def train(d: int,
                 v_tf_hard, steady_d, P_pi, phi, reward_vec, gamma)
             log['transformer mspbe hard'].append(tf_mspbe_hard)
 
-            sen_cos_sim, sen_l2_dist = compare_sensitivity(tf, tf_hard, prompt)
-            log['sensitivity cos sim'].append(sen_cos_sim)
-            log['sensitivity l2 dist'].append(sen_l2_dist)
+            zero_order_cos_sim = zero_order_comparison(v_tf, w_tf_hard, phi, steady_d)
+            log['zero order cos sim'].append(zero_order_cos_sim)
+
+            first_order_cos_sim = first_order_comparison(tf, tf_hard, prompt)
+            log['first order cos sim'].append(first_order_cos_sim)
 
             if mode == 'auto':
                 log['P'].append([tf.attn.P.detach().numpy().copy()])
@@ -228,26 +230,31 @@ def train(d: int,
         json.dump(hyperparameters, f)
 
 
-def compare_sensitivity(tf: LinearTransformer, 
-                        tf_hard: HardLinearTransformer, 
-                        prompt: MDPPrompt):
+def first_order_comparison(tf: LinearTransformer,
+                           tf_hard: HardLinearTransformer,
+                           prompt: MDPPrompt):
     '''
-    computes the cosine similarity and l2 norm between the transformers' gradients w.r.t query
+    computes the cosine similarity and l2 distance
+    between the first order approximation of the batch TD transformer
+    and the non-linear transformer
     '''
-    prompt.enable_query_grad()
 
+    # TF approximation
+    prompt.enable_query_grad()
     tf_v = tf.pred_v(prompt.z())
     tf_v.backward()
     tf_grad = prompt.query_grad().numpy()
     prompt.zero_query_grad()
 
+    # Hardcoded approximation
     tf_v_hard = tf_hard.pred_v(prompt.z())
     tf_v_hard.backward()
     tf_grad_hard = prompt.query_grad().numpy()
     prompt.disable_query_grad()
 
-    l2_dist = np.linalg.norm(tf_grad - tf_grad_hard)
-    return cos_sim(tf_grad, tf_grad_hard), l2_dist
+    first_order_tf = np.concatenate([tf_grad.flatten(), [tf_v.item()]])
+    first_order_hard = np.concatenate([tf_grad_hard.flatten(), [tf_v_hard.item()]])
+    return cos_sim(first_order_tf, first_order_hard)
 
 
 if __name__ == '__main__':
@@ -255,20 +262,22 @@ if __name__ == '__main__':
                          plot_weight_metrics, process_log)
     from utils import get_hardcoded_P, get_hardcoded_Q
     d = 4
-    n = 100
+    n = 30
     l = 3
     s = 10
     gamma = 0.9
+    mdps = 5000
+    sample_weight = False
     mode = 'auto'
     startTime = datetime.datetime.now()
     save_dir = os.path.join('./logs', "linear_discounted_train", startTime.strftime("%Y-%m-%d-%H-%M-%S"))
     data_dirs = []
-    for seed in range(5):
+    for seed in [38, 42, 99, 128, 256]:
         data_dir = os.path.join(save_dir, f'seed_{seed}')
         data_dirs.append(data_dir)
         train(d, s, n, l, lmbd=0.0, mode=mode,
-              n_mdps=20, log_interval=10,
-              random_seed=seed, save_dir=data_dir, gamma=gamma)
+              n_mdps=mdps, log_interval=10,
+              random_seed=seed, save_dir=data_dir, gamma=gamma, sample_weight=sample_weight)
         log, hyperparams = load_data(data_dir)
         xs, error_log, attn_params = process_log(log)
         l_tf = l if mode == 'sequential' else 1
