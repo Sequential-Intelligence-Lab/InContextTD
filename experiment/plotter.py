@@ -47,7 +47,8 @@ def process_log(log: dict) -> Tuple[np.ndarray, dict, dict]:
                 'transformer mspbe',
                 'transformer mspbe hard',
                 'zero order cos sim',
-                'first order cos sim',):
+                'first order cos sim',
+                'v_tf v_td msve'):
         if key in log:
             error_log[key] = np.expand_dims(log[key], axis=0)
 
@@ -295,29 +296,43 @@ def plot_error_data(xs: np.ndarray,
         plt.xlabel('# MDPs')
         plt.ylabel('MSPBE')
         plt.ylim(0)
-        plt.title(f"TF(mode={params['mode']} L={params['l']}, vf_rep={params['sample_weight']}) MSPBE")
+        plt.title(f"TF(mode={params['mode']} L={params['l']}, v_rep={params['sample_weight']}) MSPBE")
         plt.legend(frameon=True, framealpha=0.8,
                             fontsize='small').set_alpha(0.5)
         plt.savefig(os.path.join(error_dir, 'mspbe.png'), dpi=300)
         plt.close()
 
-
+    # Value function similarity
+    mean_vf_sim = np.mean(error_log['v_tf v_td msve'], axis=0)
+    std_vf_sim = np.std(error_log['v_tf v_td msve'], axis=0)
     mean_zo_cos_sim = np.mean(error_log['zero order cos sim'], axis=0)
     std_zo_cos_sim = np.std(error_log['zero order cos sim'], axis=0)
     mean_fo_cos_sim = np.mean(error_log['first order cos sim'], axis=0)
     std_fo_cos_sim = np.std(error_log['first order cos sim'], axis=0)
 
+
     plt.figure()
-    plt.title(f"TF(mode={params['mode']},L={params['l']},vf_rep={params['sample_weight']}) vs Batch TD TF")
-    plt.xlabel('# MDPs')
-    plt.ylabel('Cosine Similarity')
-    plt.plot(xs, mean_zo_cos_sim, label='0th Order Approx')
-    plt.fill_between(xs, mean_zo_cos_sim - std_zo_cos_sim,
-                     mean_zo_cos_sim + std_zo_cos_sim, lw=0, alpha=0.2)
-    plt.plot(xs, mean_fo_cos_sim, label='1st Order Approx')
-    plt.fill_between(xs, mean_fo_cos_sim - std_fo_cos_sim,
-                     mean_fo_cos_sim + std_fo_cos_sim, lw=0, alpha=0.2)
-    plt.legend()
+    fig, ax1 = plt.subplots()
+
+    ax1.set_xlabel('# MDPs')
+    ax1.set_ylabel('Cosine Similarity')
+    ax1.set_ylim(-0.3, 1.2)
+    ax1.plot(xs, mean_zo_cos_sim, label='0th Order Approx', color=sns.color_palette()[0])
+    ax1.fill_between(xs, mean_zo_cos_sim - std_zo_cos_sim,
+                     mean_zo_cos_sim + std_zo_cos_sim, lw=0, alpha=0.2, color=sns.color_palette()[0])
+    ax1.plot(xs, mean_fo_cos_sim, label='1st Order Approx', color=sns.color_palette()[1])
+    ax1.fill_between(xs, mean_fo_cos_sim - std_fo_cos_sim,
+                     mean_fo_cos_sim + std_fo_cos_sim, lw=0, alpha=0.2, color=sns.color_palette()[1])
+    ax1.legend()
+
+    ax2 = ax1.twinx()
+    ax2.set_ylabel('MSVE')
+    ax2.plot(xs, mean_vf_sim, label='Value Function Similarity', color=sns.color_palette()[2])
+    ax2.fill_between(xs, mean_vf_sim - std_vf_sim,
+                     mean_vf_sim + std_vf_sim, lw=0, alpha=0.2, color=sns.color_palette()[2])
+    ax2.tick_params(axis='y', labelcolor=sns.color_palette()[2])
+
+    fig.tight_layout()
     plt.savefig(os.path.join(error_dir, 'cos_similarity.png'), dpi=300)
     plt.close()
 
