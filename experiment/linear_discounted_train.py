@@ -65,7 +65,6 @@ def train(d: int,
           gamma: float = 0.9,
           lmbd: float = 0.0,
           sample_weight: bool = False,
-          manual: bool = False,
           mode: str = 'auto',
           lr: float = 0.001,
           weight_decay=1e-6,
@@ -116,12 +115,12 @@ def train(d: int,
             mstde = 0.0
             mstde_hard = 0.0
             Z_0 = prompt.reset()
-            v_current = tf.pred_v(Z_0, manual=manual)
-            v_hard_current = tf_hard.pred_v(Z_0, manual=manual)
+            v_current = tf.pred_v(Z_0)
+            v_hard_current = tf_hard.pred_v(Z_0)
             for _ in range(mini_batch_size):
                 Z_next, reward = prompt.step()  # slide window
-                v_next = tf.pred_v(Z_next, manual=manual)
-                v_hard_next = tf_hard.pred_v(Z_next, manual=manual)
+                v_next = tf.pred_v(Z_next)
+                v_hard_next = tf_hard.pred_v(Z_next)
                 tde = reward + gamma*v_next.detach() - v_current
                 tde_hard = reward + gamma*v_hard_next.detach() - v_hard_current
                 mstde += tde**2
@@ -213,7 +212,6 @@ def train(d: int,
         'lmbd': lmbd,
         'gamma': gamma,
         'sample_weight': sample_weight,
-        'manual': manual,
         'n_mdps': n_mdps,
         'mini_batch_size': mini_batch_size,
         'n_batch_per_mdp': n_batch_per_mdp,
