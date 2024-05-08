@@ -77,8 +77,10 @@ def plot_multiple_runs(data_dirs: List[str],
     log, params_0 = load_data(data_dirs[0])
 
     error_log_lst = []
-    P_metrics_lst = []
-    Q_metrics_lst = []
+    is_linear = params_0['linear']
+    if is_linear:
+        P_metrics_lst = []
+        Q_metrics_lst = []
     # Load data from directories
     for data_dir in data_dirs:
         log, params = load_data(data_dir)
@@ -87,20 +89,22 @@ def plot_multiple_runs(data_dirs: List[str],
         check_params(params, params_0)
         xs, error_log, attn_params = process_log(log)
         error_log_lst.append(error_log)
-        P_metrics, Q_metrics = compute_weight_metrics(attn_params,
-                                                      get_hardcoded_P(d),
-                                                      get_hardcoded_Q(d),
-                                                      d)
-        P_metrics_lst.append(P_metrics)
-        Q_metrics_lst.append(Q_metrics)
+        if is_linear:
+            P_metrics, Q_metrics = compute_weight_metrics(attn_params,
+                                                          get_hardcoded_P(d),
+                                                          get_hardcoded_Q(d),
+                                                          d)
+            P_metrics_lst.append(P_metrics)
+            Q_metrics_lst.append(Q_metrics)
 
     batched_error_log = _batch_runs(error_log_lst)
     plot_error_data(xs, batched_error_log, save_dir, params)
 
-    batched_Q_metrics = _batch_runs(Q_metrics_lst)
-    batched_P_metrics = _batch_runs(P_metrics_lst)
-    plot_weight_metrics(xs, l, batched_P_metrics,
-                        batched_Q_metrics, save_dir, params)
+    if is_linear:
+        batched_Q_metrics = _batch_runs(Q_metrics_lst)
+        batched_P_metrics = _batch_runs(P_metrics_lst)
+        plot_weight_metrics(xs, l, batched_P_metrics,
+                            batched_Q_metrics, save_dir, params)
 
 
 def plot_mean_attn_params(data_dirs: List[str],
@@ -138,8 +142,10 @@ def plot_mean_attn_params(data_dirs: List[str],
         fig, axs = plt.subplots(nrows=1, ncols=2, figsize=(10, 5), sharey=True)
         cax1 = axs[0].matshow(P, vmin=-1, vmax=1)
         if hypers['mode'] == 'sequential':
-            axs[0].set_title(f'Mean Layer {l+1} P Matrix at MDP {step}', fontsize=16)
-            axs[1].set_title(f'Mean Layer {l+1} Q Matrix at MDP {step}', fontsize=16)
+            axs[0].set_title(
+                f'Mean Layer {l+1} P Matrix at MDP {step}', fontsize=16)
+            axs[1].set_title(
+                f'Mean Layer {l+1} Q Matrix at MDP {step}', fontsize=16)
         else:
             axs[0].set_title(f'Mean P Matrix at MDP {step}', fontsize=16)
             axs[1].set_title(f'Mean Q Matrix at MDP {step}', fontsize=16)
@@ -295,12 +301,12 @@ def plot_error_data(xs: np.ndarray,
         plt.xlabel('# MDPs')
         plt.ylabel('MSPBE')
         plt.ylim(0)
-        plt.title(f"TF(mode={params['mode']} L={params['l']}, vf_rep={params['sample_weight']}) MSPBE")
+        plt.title(
+            f"TF(mode={params['mode']} L={params['l']}, vf_rep={params['sample_weight']}) MSPBE")
         plt.legend(frameon=True, framealpha=0.8,
-                            fontsize='small').set_alpha(0.5)
+                   fontsize='small').set_alpha(0.5)
         plt.savefig(os.path.join(error_dir, 'mspbe.png'), dpi=300)
         plt.close()
-
 
     mean_zo_cos_sim = np.mean(error_log['zero order cos sim'], axis=0)
     std_zo_cos_sim = np.std(error_log['zero order cos sim'], axis=0)
@@ -308,7 +314,8 @@ def plot_error_data(xs: np.ndarray,
     std_fo_cos_sim = np.std(error_log['first order cos sim'], axis=0)
 
     plt.figure()
-    plt.title(f"TF(mode={params['mode']},L={params['l']},vf_rep={params['sample_weight']}) vs Batch TD TF")
+    plt.title(
+        f"TF(mode={params['mode']},L={params['l']},vf_rep={params['sample_weight']}) vs Batch TD TF")
     plt.xlabel('# MDPs')
     plt.ylabel('Cosine Similarity')
     plt.plot(xs, mean_zo_cos_sim, label='0th Order Approx')
@@ -325,7 +332,8 @@ def plot_error_data(xs: np.ndarray,
 def plot_attention_params(xs: np.ndarray,
                           params: dict,
                           save_dir: str,
-                          log_step: int = -1) -> List[str]:
+                          log_step: int = -1,
+                          plot_alpha: bool = True) -> List[str]:
     '''
     visualize the attention parameters at a specific time step
     xs: x-axis values
@@ -362,14 +370,15 @@ def plot_attention_params(xs: np.ndarray,
         plt.close(fig)
         paths.append(save_path)
 
-    alphas = params['alpha']
-    fig = plt.figure(figsize=(10, 5))
-    plt.plot(xs, alphas)
-    plt.xlabel('# MDPs')
-    plt.ylabel('Alpha')
-    plt.title('Alpha vs # MDPs')
-    plt.savefig(os.path.join(attn_dir, 'alpha.png'))
-    plt.close(fig)
+    if plot_alpha:
+        alphas = params['alpha']
+        fig = plt.figure(figsize=(10, 5))
+        plt.plot(xs, alphas)
+        plt.xlabel('# MDPs')
+        plt.ylabel('Alpha')
+        plt.title('Alpha vs # MDPs')
+        plt.savefig(os.path.join(attn_dir, 'alpha.png'))
+        plt.close(fig)
 
     return paths
 
@@ -392,7 +401,7 @@ def generate_attention_params_gif(xs: dict,
     # list of lists to store the images for each layer
     gif_list = [[] for _ in range(l)]
     for step in range(len(xs)):
-        paths = plot_attention_params(xs, params, gif_dir, step)
+        paths = plot_attention_params(xs, params, gif_dir, step, False)
         for i, path in enumerate(paths):
             gif_list[i].append(imageio.imread(path))
             os.remove(path)
@@ -614,4 +623,4 @@ if __name__ == '__main__':
     plot_multiple_runs([os.path.join(runs_directory, run)
                        for run in runs_to_plot], runs_directory)
     plot_mean_attn_params([os.path.join(runs_directory, run)
-                            for run in runs_to_plot], runs_directory)
+                           for run in runs_to_plot], runs_directory)
