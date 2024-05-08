@@ -35,7 +35,8 @@ def _init_log() -> dict:
            'P': [],
            'Q': [],
            'zero order cos sim': [],
-           'first order cos sim': []
+           'first order cos sim': [],
+           'v_tf v_td msve': []
            }
     return log
 
@@ -188,10 +189,13 @@ def train(d: int,
                 v_tf_hard, steady_d, P_pi, phi, reward_vec, gamma)
             log['transformer mspbe hard'].append(tf_mspbe_hard)
 
+            vf_sim = compute_msve(v_tf, v_tf_hard, steady_d)
+            log['v_tf v_td msve'].append(vf_sim)
+
             zero_order_cos_sim = zero_order_comparison(v_tf, w_tf_hard, phi, steady_d)
             log['zero order cos sim'].append(zero_order_cos_sim)
 
-            first_order_cos_sim = first_order_comparison(tf, tf_hard, prompt)
+            first_order_cos_sim = first_order_comparison(tf, tf_hard, prompt, phi, steady_d)
             log['first order cos sim'].append(first_order_cos_sim)
 
             if mode == 'auto':
@@ -232,29 +236,37 @@ def train(d: int,
 
 def first_order_comparison(tf: LinearTransformer,
                            tf_hard: HardLinearTransformer,
-                           prompt: MDPPrompt):
+                           prompt: MDPPrompt,
+                           phi: np.ndarray,
+                           steady_dist: np.ndarray):
     '''
     computes the cosine similarity and l2 distance
     between the first order approximation of the batch TD transformer
-    and the non-linear transformer
+    and the linear transformer
     '''
+    first_order = 0.0
+    # loop over all the states in the state space
+    for s in range(phi.shape[0]):
+        prompt.set_query(torch.from_numpy(phi[s].reshape(-1, 1)))
+        # TF approximation
+        prompt.enable_query_grad()
+        tf_v = tf.pred_v(prompt.z())
+        tf_v.backward()
+        tf_grad = prompt.query_grad().numpy()
+        prompt.zero_query_grad()
 
-    # TF approximation
-    prompt.enable_query_grad()
-    tf_v = tf.pred_v(prompt.z())
-    tf_v.backward()
-    tf_grad = prompt.query_grad().numpy()
-    prompt.zero_query_grad()
+        # Hardcoded approximation
+        tf_v_hard = tf_hard.pred_v(prompt.z())
+        tf_v_hard.backward()
+        tf_grad_hard = prompt.query_grad().numpy()
+        prompt.disable_query_grad()
 
-    # Hardcoded approximation
-    tf_v_hard = tf_hard.pred_v(prompt.z())
-    tf_v_hard.backward()
-    tf_grad_hard = prompt.query_grad().numpy()
-    prompt.disable_query_grad()
+        first_order_tf = np.concatenate([tf_grad.flatten(), [tf_v.item()]])
+        first_order_hard = np.concatenate([tf_grad_hard.flatten(), [tf_v_hard.item()]])
 
-    first_order_tf = np.concatenate([tf_grad.flatten(), [tf_v.item()]])
-    first_order_hard = np.concatenate([tf_grad_hard.flatten(), [tf_v_hard.item()]])
-    return cos_sim(first_order_tf, first_order_hard)
+        # compute the cosine similarity weighted by the stationary distribution
+        first_order += cos_sim(first_order_tf, first_order_hard)* steady_dist[s]
+    return first_order
 
 
 if __name__ == '__main__':
