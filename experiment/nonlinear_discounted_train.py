@@ -57,6 +57,7 @@ def train(d: int,
           l: int,
           gamma: float = 0.9,
           lmbd: float = 0.0,
+          activation: str = 'softmax',
           sample_weight: bool = False,
           mode: str = 'auto',
           lr: float = 0.001,
@@ -82,12 +83,11 @@ def train(d: int,
     save_dir: directory to save logs
     mini_batch_size: mini batch size
     '''
-
     _init_save_dir(save_dir)
 
     set_seed(random_seed)
 
-    tf = Transformer(d, n, l, lmbd, mode=mode)
+    tf = Transformer(d, n, l, lmbd, activation=activation, mode=mode)
     tf_hard = HardLinearTransformer(d, n, l, lmbd)
 
     opt = optim.Adam(tf.parameters(), lr=lr, weight_decay=weight_decay)
@@ -147,12 +147,12 @@ def train(d: int,
             tf_msve = compute_msve(v_tf, true_v, steady_d)
             log['transformer msve'].append(tf_msve)
 
-            zo_cos_sim= zero_order_comparison(v_tf, w_td,
-                                                           Phi, steady_d)
+            zo_cos_sim = zero_order_comparison(v_tf, w_td,
+                                               Phi, steady_d)
             log['zero order cos sim'].append(zo_cos_sim)
 
             fo_cos_sim = first_order_comparison(tf, tf_hard,
-                                                            prompt)
+                                                prompt)
             log['first order cos sim'].append(fo_cos_sim)
 
             if mode == 'auto':
@@ -189,6 +189,7 @@ def train(d: int,
     with open(os.path.join(save_dir, 'params.json'), 'w') as f:
         json.dump(hyperparameters, f)
 
+
 def first_order_comparison(tf: Transformer,
                            tf_hard: HardLinearTransformer,
                            prompt: MDPPrompt):
@@ -212,7 +213,8 @@ def first_order_comparison(tf: Transformer,
     prompt.disable_query_grad()
 
     first_order_tf = np.concatenate([tf_grad.flatten(), [tf_v.item()]])
-    first_order_hard = np.concatenate([tf_grad_hard.flatten(), [tf_v_hard.item()]])
+    first_order_hard = np.concatenate(
+        [tf_grad_hard.flatten(), [tf_v_hard.item()]])
     return cos_sim(first_order_tf, first_order_hard)
 
 
