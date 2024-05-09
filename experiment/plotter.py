@@ -9,7 +9,7 @@ import scienceplots
 import seaborn as sns
 
 from experiment.utils import (check_params, compare_P, compare_Q,
-                              get_hardcoded_P, get_hardcoded_Q, scale)
+                              get_hardcoded_P, get_hardcoded_Q, scale, smooth_data)
 
 
 def load_data(data_dir: str) -> Tuple[dict, dict]:
@@ -48,6 +48,8 @@ def process_log(log: dict) -> Tuple[np.ndarray, dict, dict]:
                 'transformer mspbe hard',
                 'zero order cos sim',
                 'first order cos sim',
+                'sensitivity cos sim',
+                'sensitivity l2 dist',
                 'v_tf v_td msve'):
         if key in log:
             error_log[key] = np.expand_dims(log[key], axis=0)
@@ -315,29 +317,67 @@ def plot_error_data(xs: np.ndarray,
     std_zo_cos_sim = np.std(error_log['zero order cos sim'], axis=0)
     mean_fo_cos_sim = np.mean(error_log['first order cos sim'], axis=0)
     std_fo_cos_sim = np.std(error_log['first order cos sim'], axis=0)
+    mean_sensitivity_cos_sim = np.mean(error_log['sensitivity cos sim'], axis=0)
+    std_sensitivity_cos_sim = np.std(error_log['sensitivity cos sim'], axis=0)
+
+    # are you allowed to just smooth the standard deviations like that?
+    mean_vf_sim_smooth = smooth_data(mean_vf_sim, 5)
+    mean_zo_cos_sim_smooth = smooth_data(mean_zo_cos_sim, 5)
+    mean_fo_cos_sim_smooth = smooth_data(mean_fo_cos_sim, 5)
+    mean_sensitivity_cos_sim_smooth = smooth_data(mean_sensitivity_cos_sim, 5)
+
 
 
     plt.figure()
     fig, ax1 = plt.subplots()
-
+    plt.title(f"TF(mode={params['mode']} L={params['l']}, v rep={params['sample_weight']}) and Batch TD \n Predicted Value Function Comparison")
     ax1.set_xlabel('# MDPs')
     ax1.set_ylabel('Cosine Similarity')
     ax1.set_ylim(-0.3, 1.2)
-    ax1.plot(xs, mean_zo_cos_sim, label='0th Order Approx', color=sns.color_palette()[0])
-    ax1.fill_between(xs, mean_zo_cos_sim - std_zo_cos_sim,
-                     mean_zo_cos_sim + std_zo_cos_sim, lw=0, alpha=0.2, color=sns.color_palette()[0])
-    ax1.plot(xs, mean_fo_cos_sim, label='1st Order Approx', color=sns.color_palette()[1])
-    ax1.fill_between(xs, mean_fo_cos_sim - std_fo_cos_sim,
-                     mean_fo_cos_sim + std_fo_cos_sim, lw=0, alpha=0.2, color=sns.color_palette()[1])
-    ax1.legend()
+    c, = ax1.plot(xs, mean_zo_cos_sim_smooth, label='0th Order', color=sns.color_palette()[0])
+    ax1.fill_between(xs, mean_zo_cos_sim_smooth - std_zo_cos_sim,
+                     mean_zo_cos_sim_smooth + std_zo_cos_sim, lw=0, alpha=0.2, color=sns.color_palette()[0])
+    a, = ax1.plot(xs, mean_sensitivity_cos_sim_smooth, label='Sensitivity', color=sns.color_palette()[3])
+    ax1.fill_between(xs, mean_sensitivity_cos_sim_smooth - std_sensitivity_cos_sim,
+                     mean_sensitivity_cos_sim_smooth + std_sensitivity_cos_sim, lw=0, alpha=0.2, color=sns.color_palette()[3])
 
     ax2 = ax1.twinx()
     ax2.set_ylabel('MSVE')
-    ax2.plot(xs, mean_vf_sim, label='Value Function Similarity', color=sns.color_palette()[2])
-    ax2.fill_between(xs, mean_vf_sim - std_vf_sim,
-                     mean_vf_sim + std_vf_sim, lw=0, alpha=0.2, color=sns.color_palette()[2])
-    ax2.tick_params(axis='y', labelcolor=sns.color_palette()[2])
+    b, = ax2.plot(xs, mean_vf_sim_smooth, label='MSVE', color=sns.color_palette()[2])
+    ax2.fill_between(xs, mean_vf_sim_smooth - std_vf_sim,
+                     mean_vf_sim_smooth + std_vf_sim, lw=0, alpha=0.2, color=sns.color_palette()[2])
+    ax2.tick_params(axis='y')
+    ax1.set_zorder(ax2.get_zorder() + 1) # bring axis 1 to the front
+    p = [a, b, c]
+    ax1.legend(p, [p_.get_label() for p_ in p], frameon=True, framealpha=0.8,
+                            fontsize='small')
+    fig.tight_layout()
+    plt.savefig(os.path.join(error_dir, 'cos_similarity_smooth.png'), dpi=300)
+    plt.close()
 
+    plt.figure()
+    fig, ax1 = plt.subplots()
+    plt.title(f"TF(mode={params['mode']} L={params['l']}, v rep={params['sample_weight']}) and Batch TD \n Predicted Value Function Comparison")
+    ax1.set_xlabel('# MDPs')
+    ax1.set_ylabel('Cosine Similarity')
+    ax1.set_ylim(-0.3, 1.2)
+    c, = ax1.plot(xs, mean_zo_cos_sim, label='0th Order', color=sns.color_palette()[0])
+    ax1.fill_between(xs, mean_zo_cos_sim - std_zo_cos_sim,
+                     mean_zo_cos_sim + std_zo_cos_sim, lw=0, alpha=0.2, color=sns.color_palette()[0])
+    a, = ax1.plot(xs, mean_sensitivity_cos_sim, label='Sensitivity', color=sns.color_palette()[2])
+    ax1.fill_between(xs, mean_sensitivity_cos_sim - std_sensitivity_cos_sim,
+                     mean_sensitivity_cos_sim + std_sensitivity_cos_sim, lw=0, alpha=0.2, color=sns.color_palette()[2])
+
+    ax2 = ax1.twinx()
+    ax2.set_ylabel('MSVE')
+    b, = ax2.plot(xs, mean_vf_sim, label='MSVE', color=sns.color_palette()[1])
+    ax2.fill_between(xs, mean_vf_sim - std_vf_sim,
+                     mean_vf_sim + std_vf_sim, lw=0, alpha=0.2, color=sns.color_palette()[1])
+    ax2.tick_params(axis='y')
+    ax1.set_zorder(ax2.get_zorder() + 1) # bring axis 1 to the front
+    p = [a, b, c]
+    ax1.legend(p, [p_.get_label() for p_ in p], frameon=True, framealpha=0.8,
+                            fontsize='small')
     fig.tight_layout()
     plt.savefig(os.path.join(error_dir, 'cos_similarity.png'), dpi=300)
     plt.close()
@@ -631,7 +671,7 @@ def compute_weight_metrics(attn_params: dict,
 
 if __name__ == '__main__':
     runs_directory = os.path.join(
-        './logs', 'linear_discounted_train', '2024-05-07-11-57-05')
+        './logs', 'linear_discounted_train', '2024-05-09-09-42-13')
     runs_to_plot = [run for run in os.listdir(
         runs_directory) if run.startswith('seed')]
     plot_multiple_runs([os.path.join(runs_directory, run)

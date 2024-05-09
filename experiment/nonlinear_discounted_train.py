@@ -24,6 +24,8 @@ def _init_log() -> dict:
            'transformer msve': [],
            'zero order cos sim': [],
            'first order cos sim': [],
+           'sensitivity cos sim': [],
+           'sensitivity l2 dist': [],
            'value dist': [],
            'P': [],
            'Q': [],
@@ -162,6 +164,10 @@ def train(d: int,
             fo_cos_sim = first_order_comparison(tf, tf_hard, prompt, Phi, steady_d)
             log['first order cos sim'].append(fo_cos_sim)
 
+            sensitivity_cos_sim, l2_dist = compare_sensitivity(tf, tf_hard, prompt)
+            log['sensitivity cos sim'].append(sensitivity_cos_sim)
+            log['sensitivity l2 dist'].append(l2_dist)
+
             if mode == 'auto':
                 log['P'].append([tf.attn.P.detach().numpy().copy()])
                 log['Q'].append([tf.attn.Q.detach().numpy().copy()])
@@ -196,6 +202,26 @@ def train(d: int,
     with open(os.path.join(save_dir, 'params.json'), 'w') as f:
         json.dump(hyperparameters, f)
 
+def compare_sensitivity(tf: Transformer, 
+                        tf_hard: HardLinearTransformer, 
+                        prompt: MDPPrompt):
+    '''
+    computes the cosine similarity and l2 norm between the transformers' gradients w.r.t query
+    '''
+    prompt.enable_query_grad()
+
+    tf_v = tf.pred_v(prompt.z())
+    tf_v.backward()
+    tf_grad = prompt.query_grad().numpy()
+    prompt.zero_query_grad()
+
+    tf_v_hard = tf_hard.pred_v(prompt.z())
+    tf_v_hard.backward()
+    tf_grad_hard = prompt.query_grad().numpy()
+    prompt.disable_query_grad()
+
+    l2_dist = np.linalg.norm(tf_grad - tf_grad_hard)
+    return cos_sim(tf_grad, tf_grad_hard), l2_dist
 
 def first_order_comparison(tf: Transformer,
                            tf_hard: HardLinearTransformer,
@@ -250,7 +276,7 @@ if __name__ == '__main__':
         data_dir = os.path.join(save_dir, f'seed_{seed}')
         data_dirs.append(data_dir)
         train(d, s, n, l, lmbd=0.0, mode=mode,
-              n_mdps=5000, log_interval=10,
+              n_mdps=4000, log_interval=10,
               random_seed=seed, save_dir=data_dir,
               gamma=gamma, sample_weight=True)
         log, hyperparams = load_data(data_dir)
