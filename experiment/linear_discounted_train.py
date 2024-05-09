@@ -191,6 +191,10 @@ def train(d: int,
                 v_tf_hard, steady_d, P_pi, phi, reward_vec, gamma)
             log['transformer mspbe hard'].append(tf_mspbe_hard)
 
+            sensitivity_cos_sim, l2_dist = compare_sensitivity(tf, tf_hard, prompt)
+            log['sensitivity cos sim'].append(sensitivity_cos_sim)
+            log['sensitivity l2 dist'].append(l2_dist)
+
             vf_sim = compute_msve(v_tf, v_tf_hard, steady_d)
             log['v_tf v_td msve'].append(vf_sim)
 
@@ -199,10 +203,6 @@ def train(d: int,
 
             first_order_cos_sim = first_order_comparison(tf, tf_hard, prompt, phi, steady_d)
             log['first order cos sim'].append(first_order_cos_sim)
-
-            sensitivity_cos_sim, l2_dist = compare_sensitivity(tf, tf_hard, prompt)
-            log['sensitivity cos sim'].append(sensitivity_cos_sim)
-            log['sensitivity l2 dist'].append(l2_dist)
 
             if mode == 'auto':
                 log['P'].append([tf.attn.P.detach().numpy().copy()])

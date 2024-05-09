@@ -250,8 +250,10 @@ def smooth_data(data: np.ndarray, window_size: int) -> np.ndarray:
     window_size: size of the moving average window
     return: smoothed data
     '''
-    window= np.ones(int(window_size))/float(window_size)
-    return np.convolve(data, window, 'same')
+    padded_data = np.pad(data, (window_size//2, window_size//2), mode='edge')
+    window = np.ones(int(window_size))/float(window_size)
+    smoothed_data = np.convolve(padded_data, window, 'valid')
+    return smoothed_data
 
 if __name__ == '__main__':
     from MRP.boyan import BoyanChain
