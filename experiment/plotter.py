@@ -346,6 +346,7 @@ def plot_error_data(xs: np.ndarray,
     b, = ax2.plot(xs, mean_vf_sim_smooth, label='MSVE', color=sns.color_palette()[1])
     ax2.fill_between(xs, mean_vf_sim_smooth - std_vf_sim,
                      mean_vf_sim_smooth + std_vf_sim, lw=0, alpha=0.2, color=sns.color_palette()[1])
+
     ax2.tick_params(axis='y')
     ax1.set_zorder(ax2.get_zorder() + 1) # bring axis 1 to the front
     p = [a, b, c]
@@ -367,7 +368,6 @@ def plot_error_data(xs: np.ndarray,
     a, = ax1.plot(xs, mean_sensitivity_cos_sim, label='Sensitivity', color=sns.color_palette()[2])
     ax1.fill_between(xs, mean_sensitivity_cos_sim - std_sensitivity_cos_sim,
                      mean_sensitivity_cos_sim + std_sensitivity_cos_sim, lw=0, alpha=0.2, color=sns.color_palette()[2])
-    import pdb; pdb.set_trace()
     ax2 = ax1.twinx()
     ax2.set_ylabel('MSVE')
     b, = ax2.plot(xs, mean_vf_sim, label='MSVE', color=sns.color_palette()[1])
@@ -671,7 +671,7 @@ def compute_weight_metrics(attn_params: dict,
 
 if __name__ == '__main__':
     runs_directory = os.path.join(
-        './logs', 'linear_discounted_train', '2024-05-09-10-02-21')
+        './logs', 'linear_discounted_train', '2024-05-09-09-42-13')
     runs_to_plot = [run for run in os.listdir(
         runs_directory) if run.startswith('seed')]
     plot_multiple_runs([os.path.join(runs_directory, run)
