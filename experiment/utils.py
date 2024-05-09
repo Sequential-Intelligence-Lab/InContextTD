@@ -243,6 +243,15 @@ def zero_order_comparison(v_tf: np.ndarray,
     w_tf = solve_msve_weight(steady_dist, Phi, v_tf)
     return cos_sim(w_tf, w_td)
 
+def smooth_data(data: np.ndarray, window_size: int) -> np.ndarray:
+    '''
+    Smooth the data using a moving average window
+    data: input data to be smoothed
+    window_size: size of the moving average window
+    return: smoothed data
+    '''
+    window= np.ones(int(window_size))/float(window_size)
+    return np.convolve(data, window, 'same')
 
 if __name__ == '__main__':
     from MRP.boyan import BoyanChain

@@ -23,12 +23,11 @@ def _init_log() -> dict:
            'mstde hard': [],
            'transformer msve': [],
            'zero order cos sim': [],
-           'zero order l2 dist': [],
            'first order cos sim': [],
-           'first order l2 dist': [],
            'value dist': [],
            'P': [],
-           'Q': []
+           'Q': [],
+            'v_tf v_td msve': []
            }
     return log
 
@@ -82,6 +81,9 @@ def train(d: int,
     log_interval: logging interval
     save_dir: directory to save logs
     mini_batch_size: mini batch size
+    n_batch_per_mdp: number of batches per MDP
+    n_mdps: number of MDPs
+    random_seed: random seed
     '''
     _init_save_dir(save_dir)
 
@@ -138,6 +140,8 @@ def train(d: int,
                 prompt.context(), prompt.get_feature_mat()).detach().numpy()
             w_td: np.ndarray = tf_hard.manual_weight_extraction(
                 prompt.context(), d).detach().numpy()
+            v_tf_hard: np.ndarray = tf_hard.fit_value_func(
+                prompt.context(), prompt.get_feature_mat()).detach().numpy()
 
             log['xs'].append(i)
             log['alpha'].append(tf_hard.attn.alpha.item())
@@ -147,12 +151,15 @@ def train(d: int,
             tf_msve = compute_msve(v_tf, true_v, steady_d)
             log['transformer msve'].append(tf_msve)
 
-            zo_cos_sim = zero_order_comparison(v_tf, w_td,
-                                               Phi, steady_d)
+
+            vf_sim = compute_msve(v_tf, v_tf_hard, steady_d)
+            log['v_tf v_td msve'].append(vf_sim)
+
+            zo_cos_sim= zero_order_comparison(v_tf, w_td,
+                                                           Phi, steady_d)
             log['zero order cos sim'].append(zo_cos_sim)
 
-            fo_cos_sim = first_order_comparison(tf, tf_hard,
-                                                prompt)
+            fo_cos_sim = first_order_comparison(tf, tf_hard, prompt, Phi, steady_d)
             log['first order cos sim'].append(fo_cos_sim)
 
             if mode == 'auto':
@@ -192,30 +199,37 @@ def train(d: int,
 
 def first_order_comparison(tf: Transformer,
                            tf_hard: HardLinearTransformer,
-                           prompt: MDPPrompt):
+                           prompt: MDPPrompt,
+                           phi: np.ndarray,
+                           steady_dist: np.ndarray):
     '''
     computes the cosine similarity and l2 distance
     between the first order approximation of the batch TD transformer
-    and the non-linear transformer
+    and the linear transformer
     '''
+    first_order = 0.0
+    # loop over all the states in the state space
+    for s in range(phi.shape[0]):
+        prompt.set_query(torch.from_numpy(phi[s].reshape(-1, 1)))
+        # TF approximation
+        prompt.enable_query_grad()
+        tf_v = tf.pred_v(prompt.z())
+        tf_v.backward()
+        tf_grad = prompt.query_grad().numpy()
+        prompt.zero_query_grad()
 
-    # TF approximation
-    prompt.enable_query_grad()
-    tf_v = tf.pred_v(prompt.z())
-    tf_v.backward()
-    tf_grad = prompt.query_grad().numpy()
-    prompt.zero_query_grad()
+        # Hardcoded approximation
+        tf_v_hard = tf_hard.pred_v(prompt.z())
+        tf_v_hard.backward()
+        tf_grad_hard = prompt.query_grad().numpy()
+        prompt.disable_query_grad()
 
-    # Hardcoded approximation
-    tf_v_hard = tf_hard.pred_v(prompt.z())
-    tf_v_hard.backward()
-    tf_grad_hard = prompt.query_grad().numpy()
-    prompt.disable_query_grad()
+        first_order_tf = np.concatenate([tf_grad.flatten(), [tf_v.item()]])
+        first_order_hard = np.concatenate([tf_grad_hard.flatten(), [tf_v_hard.item()]])
 
-    first_order_tf = np.concatenate([tf_grad.flatten(), [tf_v.item()]])
-    first_order_hard = np.concatenate(
-        [tf_grad_hard.flatten(), [tf_v_hard.item()]])
-    return cos_sim(first_order_tf, first_order_hard)
+        # compute the cosine similarity weighted by the stationary distribution
+        first_order += cos_sim(first_order_tf, first_order_hard)* steady_dist[s]
+    return first_order
 
 
 if __name__ == '__main__':
