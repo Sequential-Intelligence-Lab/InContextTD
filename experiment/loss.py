@@ -1,6 +1,6 @@
 import torch
 import numpy as np
-from model import LinearTransformer
+from experiment.model import LinearTransformer
 
 
 def mean_squared_td_error(reward_vec: torch.tensor,

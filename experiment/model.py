@@ -1,8 +1,8 @@
 import torch
 import torch.nn as nn
 import numpy as np
-from utils import stack_four
-
+from experiment.utils import stack_four
+from experiment.activation import get_activation
 
 class LinearAttention(nn.Module):
     def __init__(self, d: int, n: int, lmbd: float = 0.0):
@@ -131,7 +131,8 @@ class Attention(nn.Module):
     def __init__(self,
                  d: int,
                  n: int,
-                 lmbd: float = 0.0):
+                 lmbd: float = 0.0,
+                 activation: str = 'softmax'):
         '''
         d: feature dimension
         n: context length
@@ -140,6 +141,7 @@ class Attention(nn.Module):
         super(Attention, self).__init__()
         self.d = d
         self.n = n
+        self.activation = get_activation(activation)
         M = torch.eye(n + 1)
         for col in range(n):
             for row in range(col + 1, n):
@@ -152,7 +154,7 @@ class Attention(nn.Module):
 
     def forward(self, Z):
         X = Z.T @ self.Q @ Z
-        return Z + 1.0 / self.n * self.P @ Z @ self.M @ torch.softmax(X, dim=1)
+        return Z + 1.0 / self.n * self.P @ Z @ self.M @ self.activation(X)
 
 
 class Transformer(nn.Module):
@@ -161,6 +163,7 @@ class Transformer(nn.Module):
                  n: int,
                  l: int,
                  lmbd: float = 0.0,
+                 activation: str = 'softmax',
                  mode='auto'):
         '''
         d: feature dimension
@@ -174,13 +177,13 @@ class Transformer(nn.Module):
         self.lmbd = lmbd
         self.mode = mode
         if mode == 'auto':
-            attn = Attention(d, n, lmbd)
+            attn = Attention(d, n, lmbd, activation)
             nn.init.xavier_normal_(attn.P, gain=0.1)
             nn.init.xavier_normal_(attn.Q, gain=0.1)
             self.attn = attn
         elif mode == 'sequential':
             self.layers = nn.ModuleList(
-                [Attention(d, n, lmbd) for _ in range(l)])
+                [Attention(d, n, lmbd, activation) for _ in range(l)])
             for attn in self.layers:
                 nn.init.xavier_normal_(attn.P, gain=0.1/l)
                 nn.init.xavier_normal_(attn.Q, gain=0.1/l)

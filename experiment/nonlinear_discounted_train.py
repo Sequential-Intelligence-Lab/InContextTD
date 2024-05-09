@@ -58,6 +58,7 @@ def train(d: int,
           l: int,
           gamma: float = 0.9,
           lmbd: float = 0.0,
+          activation: str = 'softmax',
           sample_weight: bool = False,
           mode: str = 'auto',
           lr: float = 0.001,
@@ -86,12 +87,11 @@ def train(d: int,
     n_mdps: number of MDPs
     random_seed: random seed
     '''
-
     _init_save_dir(save_dir)
 
     set_seed(random_seed)
 
-    tf = Transformer(d, n, l, lmbd, mode=mode)
+    tf = Transformer(d, n, l, lmbd, activation=activation, mode=mode)
     tf_hard = HardLinearTransformer(d, n, l, lmbd)
 
     opt = optim.Adam(tf.parameters(), lr=lr, weight_decay=weight_decay)
