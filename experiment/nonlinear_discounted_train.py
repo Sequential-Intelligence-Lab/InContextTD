@@ -278,7 +278,7 @@ if __name__ == '__main__':
         train(d, s, n, l, lmbd=0.0, mode=mode,
               n_mdps=4000, log_interval=10,
               random_seed=seed, save_dir=data_dir,
-              gamma=gamma, sample_weight=True)
+              gamma=gamma, sample_weight=False)
         log, hyperparams = load_data(data_dir)
         xs, error_log, attn_params = process_log(log)
         l_tf = l if mode == 'sequential' else 1
