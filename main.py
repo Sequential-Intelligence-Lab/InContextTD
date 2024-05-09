@@ -32,7 +32,7 @@ if __name__ == '__main__':
     parser.add_argument('--sample_weight', action='store_true',
                         help='sample a random true weight vector, such that the value function is fully representable by the features')
     parser.add_argument('--n_mdps', type=int,
-                        help='total number of MDPs for training ', default=5_000)
+                        help='total number of MDPs for training ', default=4_000)
     parser.add_argument('--batch_size', type=int,
                         help='mini batch size', default=64)
     parser.add_argument('--n_batch_per_mdp', type=int,
