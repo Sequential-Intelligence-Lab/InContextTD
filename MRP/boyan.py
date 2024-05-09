@@ -10,8 +10,8 @@ class BoyanChain(MRP):
     def __init__(self,
                  n_states: int,
                  gamma: float = 0.9,
-                 weight: np.array = None,
-                 X: np.array = None) -> None:
+                 weight: np.ndarray = None,
+                 X: np.ndarray = None) -> None:
         '''
         n_states: number of states of the Boyan Chain
         gamma: discount factor
@@ -44,8 +44,7 @@ class BoyanChain(MRP):
             self.r = (np.eye(n_states) - gamma * self.P).dot(self.v)
         else:
             self.r = np.random.uniform(low=-1.0, high=1.0, size=(n_states, 1))
-            self.v = np.linalg.inv(
-                np.eye(n_states) - gamma * self.P).dot(self.r)
+            self.v = np.linalg.inv(np.eye(n_states) - gamma * self.P).dot(self.r)
 
     def reset(self) -> int:
         s = np.random.choice(self.n_states, p=self.mu)
@@ -59,6 +58,17 @@ class BoyanChain(MRP):
     
     def sample_stationary(self) -> int:
         return np.random.choice(self.n_states, p=self.steady_d)
+    
+    def copy(self) -> 'BoyanChain':
+        bc = BoyanChain(self.n_states, self.gamma)
+        bc.P = self.P.copy()
+        bc.mu = self.mu.copy()
+        bc.r = self.r.copy()
+        bc.v = self.v.copy()
+        bc.steady_d = self.steady_d.copy()
+        if hasattr(self, 'w'):
+            bc.w = self.w.copy()
+        return bc
 
 
 if __name__ == '__main__':

@@ -243,6 +243,7 @@ def compare_sensitivity(tf: LinearTransformer,
     '''
     computes the cosine similarity and l2 norm between the transformers' gradients w.r.t query
     '''
+    prompt = prompt.copy()
     prompt.enable_query_grad()
 
     tf_v = tf.pred_v(prompt.z())
@@ -268,6 +269,7 @@ def first_order_comparison(tf: LinearTransformer,
     between the first order approximation of the batch TD transformer
     and the linear transformer
     '''
+    prompt = prompt.copy()
     first_order = 0.0
     # loop over all the states in the state space
     for s in range(phi.shape[0]):
