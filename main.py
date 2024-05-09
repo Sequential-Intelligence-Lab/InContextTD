@@ -54,6 +54,8 @@ if __name__ == '__main__':
     parser.add_argument('--gen_gif',
                         help='generate a GIF for the evolution of weights',
                         action='store_true')
+    parser.add_argument('-v', '--verbose', action='store_true',
+                        help='print training details')
 
     args: Namespace = parser.parse_args()
     if args.save_dir:
@@ -66,6 +68,31 @@ if __name__ == '__main__':
                                 start_time.strftime("%Y-%m-%d-%H-%M-%S"))
     if args.suffix:
         save_dir += f'_{args.suffix}'
+
+    if args.verbose:
+        if args.linear:
+            print(
+                f"Training a linear {args.mode} transformer of {args.num_layers} layer(s).")
+        else:
+            print(
+                f"Training a nonlinear {args.mode} transformer of {args.num_layers} layer(s) with {args.activation} activation.")
+        print(f"Feature dimension: {args.dim_feature}")
+        print(f"Context length: {args.context_length}")
+        print(f"Number of states in the MDP: {args.num_states}")
+        print(f"Discount factor: {args.gamma}")
+        print(f"Eligibility trace decay rate: {args.lmbd}")
+        tf_v = 'representable' if args.sample_weight else 'unrepresentable'
+        print(f"Value function is {tf_v} by the features.")
+        print(f"Number of MDPs for training: {args.n_mdps}")
+        print(f'Number of mini-batches per MDP: {args.n_batch_per_mdp}')
+        print(f'Mini-batch size: {args.batch_size}')
+        print(
+            f'Total number of prompts for training: {args.n_mdps * args.n_batch_per_mdp * args.batch_size}')
+        print(f'Learning rate: {args.lr}')
+        print(f'Regularization term: {args.weight_decay}')
+        print(f'Logging interval: {args.log_interval}')
+        print(f'Save directory: {save_dir}')
+        print(f'Random seeds: {",".join(map(str, args.seed))}')
 
     data_dirs = []
     for seed in args.seed:
