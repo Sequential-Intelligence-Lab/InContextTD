@@ -36,7 +36,9 @@ def _init_log() -> dict:
            'Q': [],
            'zero order cos sim': [],
            'first order cos sim': [],
-           'v_tf v_td msve': []
+           'v_tf v_td msve': [],
+            'sensitivity cos sim': [],
+            'sensitivity l2 dist': []
            }
     return log
 
@@ -198,6 +200,10 @@ def train(d: int,
             first_order_cos_sim = first_order_comparison(tf, tf_hard, prompt, phi, steady_d)
             log['first order cos sim'].append(first_order_cos_sim)
 
+            sensitivity_cos_sim, l2_dist = compare_sensitivity(tf, tf_hard, prompt)
+            log['sensitivity cos sim'].append(sensitivity_cos_sim)
+            log['sensitivity l2 dist'].append(l2_dist)
+
             if mode == 'auto':
                 log['P'].append([tf.attn.P.detach().numpy().copy()])
                 log['Q'].append([tf.attn.Q.detach().numpy().copy()])
@@ -233,6 +239,26 @@ def train(d: int,
     with open(os.path.join(save_dir, 'params.json'), 'w') as f:
         json.dump(hyperparameters, f)
 
+def compare_sensitivity(tf: LinearTransformer, 
+                        tf_hard: HardLinearTransformer, 
+                        prompt: MDPPrompt):
+    '''
+    computes the cosine similarity and l2 norm between the transformers' gradients w.r.t query
+    '''
+    prompt.enable_query_grad()
+
+    tf_v = tf.pred_v(prompt.z())
+    tf_v.backward()
+    tf_grad = prompt.query_grad().numpy()
+    prompt.zero_query_grad()
+
+    tf_v_hard = tf_hard.pred_v(prompt.z())
+    tf_v_hard.backward()
+    tf_grad_hard = prompt.query_grad().numpy()
+    prompt.disable_query_grad()
+
+    l2_dist = np.linalg.norm(tf_grad - tf_grad_hard)
+    return cos_sim(tf_grad, tf_grad_hard), l2_dist
 
 def first_order_comparison(tf: LinearTransformer,
                            tf_hard: HardLinearTransformer,
@@ -278,7 +304,7 @@ if __name__ == '__main__':
     l = 3
     s = 10
     gamma = 0.9
-    mdps = 5000
+    mdps = 4000
     sample_weight = False
     mode = 'auto'
     startTime = datetime.datetime.now()
