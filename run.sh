@@ -1,5 +1,6 @@
 ####################################################### linear transformer ####################################################### 
 python main.py --suffix=standard --linear -v # standard
+python main.py --suffix=1layer -l=1 --linear -v # 1 layer auto
 python main.py --suffix=2layers -l=2 --linear -v # 2 layers auto
 python main.py --suffix=4layers -l=4 --linear -v # 4 layers auto
 python main.py --suffix=sequential --mode=sequential --linear -v # standard sequential
