@@ -39,9 +39,9 @@ def process_log(log: dict) -> Tuple[np.ndarray, dict, dict]:
                 'mstde hard',
                 'true msve',
                 'transformer msve',
-                'transformer msve hard',
+                'batch td msve',
                 'transformer mspbe',
-                'transformer mspbe hard',
+                'batch td mspbe',
                 'zero order cos sim',
                 'zero order l2 dist',
                 'first order cos sim',
@@ -144,12 +144,12 @@ def plot_mean_attn_params(data_dirs: List[str],
         cax1 = axs[0].matshow(P, vmin=-1, vmax=1)
         if hypers['mode'] == 'sequential':
             axs[0].set_title(
-                f'Mean Layer {l+1} P Matrix at MDP {step}', fontsize=16)
+                f'Mean Layer {l+1} P Matrix at MRP {step}', fontsize=16)
             axs[1].set_title(
-                f'Mean Layer {l+1} Q Matrix at MDP {step}', fontsize=16)
+                f'Mean Layer {l+1} Q Matrix at MRP {step}', fontsize=16)
         else:
-            axs[0].set_title(f'Mean P Matrix at MDP {step}', fontsize=16)
-            axs[1].set_title(f'Mean Q Matrix at MDP {step}', fontsize=16)
+            axs[0].set_title(f'Mean P Matrix at MRP {step}', fontsize=16)
+            axs[1].set_title(f'Mean Q Matrix at MRP {step}', fontsize=16)
         axs[1].matshow(Q, vmin=-1, vmax=1)
         fig.colorbar(cax1, ax=axs, orientation='vertical')
         axs[0].tick_params(axis='both', which='both',
@@ -166,9 +166,9 @@ def plot_mean_attn_params(data_dirs: List[str],
     plt.plot(xs, mean_alphas)
     plt.fill_between(xs, mean_alphas - std_alphas,
                      mean_alphas + std_alphas, alpha=0.2)
-    plt.xlabel('# MDPs')
+    plt.xlabel('# MRPS')
     plt.ylabel('Alpha')
-    plt.title('Mean Alpha vs # MDPs')
+    plt.title('Mean Alpha vs # MRPS')
     plt.savefig(os.path.join(attn_dir, 'alpha.png'))
     plt.close(fig)
 
@@ -212,91 +212,89 @@ def plot_error_data(xs: np.ndarray,
     std_mstde = np.std(error_log['mstde'], axis=0)
     mean_mstde_hard = np.mean(error_log['mstde hard'], axis=0)
     std_mstde_hard = np.std(error_log['mstde hard'], axis=0)
-    plt.figure()
+    fig = plt.figure()
     plt.plot(xs, mean_mstde, label='MSTDE')
     plt.fill_between(xs, mean_mstde - std_mstde,
                      mean_mstde + std_mstde, alpha=0.2)
     plt.plot(xs, mean_mstde_hard, label='MSTDE Hard')
     plt.fill_between(xs, mean_mstde_hard - std_mstde_hard,
                      mean_mstde_hard + std_mstde_hard, alpha=0.2)
-    plt.xlabel('# MDPs')
+    plt.xlabel('# MRPS')
     plt.ylabel('Loss (MSTDE)')
     plt.title(f'{transformer_title}\n Training Loss (MSTDE)')
     plt.legend()
     plt.savefig(os.path.join(error_dir, 'loss_mstde.png'), dpi=300)
-    plt.close()
+    plt.close(fig)
 
     # Value error
     mean_tf_msve = np.mean(error_log['transformer msve'], axis=0)
     std_tf_msve = np.std(error_log['transformer msve'], axis=0)
 
-    plt.figure()
+    fig = plt.figure()
     plt.plot(xs, mean_tf_msve, label='TF')
     plt.fill_between(xs, mean_tf_msve - std_tf_msve,
-                        mean_tf_msve + std_tf_msve, alpha=0.2)
+                     mean_tf_msve + std_tf_msve, alpha=0.2)
     if params['linear']:
-        mean_tf_msve_hard = np.mean(error_log['transformer msve hard'], axis=0)
-        std_tf_msve_hard = np.std(error_log['transformer msve hard'], axis=0)
+        mean_td_msve = np.mean(error_log['batch td msve'], axis=0)
+        std_td_msve = np.std(error_log['batch td msve'], axis=0)
         mean_true_msve = np.mean(error_log['true msve'], axis=0)
         std_true_msve = np.std(error_log['true msve'], axis=0)
 
-        plt.plot(xs, mean_tf_msve_hard, label='$TF^{"TD"}$')
-        plt.fill_between(xs, mean_tf_msve_hard - std_tf_msve_hard,
-                            mean_tf_msve_hard + std_tf_msve_hard, alpha=0.2)
-        plt.plot(xs, mean_true_msve, label='True')
+        plt.plot(xs, mean_td_msve, label='TD')
+        plt.fill_between(xs, mean_td_msve - std_td_msve,
+                         mean_td_msve + std_td_msve, alpha=0.2)
+        plt.plot(xs, mean_true_msve, label='True Min')
         plt.fill_between(xs, mean_true_msve - std_true_msve,
-                            mean_true_msve + std_true_msve, alpha=0.2)
-    plt.xlabel('# MDPs')
+                         mean_true_msve + std_true_msve, alpha=0.2)
+    plt.xlabel('# MRPS')
     plt.ylabel('MSVE')
-    plt.title(f'{transformer_title}\n MSVE vs # MDPs')
+    plt.title(f'{transformer_title}\n MSVE vs # MRPS')
     plt.legend()
     plt.savefig(os.path.join(error_dir, 'msve.png'), dpi=300)
-    plt.close()
+    plt.close(fig)
 
     if params['linear']:  # MSPBE only computable for linear TF
         # MSPBE
         mean_tf_mspbe = np.mean(error_log['transformer mspbe'], axis=0)
         std_tf_mspbe = np.std(error_log['transformer mspbe'], axis=0)
-        mean_tf_mspbe_hard = np.mean(
-            error_log['transformer mspbe hard'], axis=0)
-        std_tf_mspbe_hard = np.std(error_log['transformer mspbe hard'], axis=0)
-        plt.figure()
+        mean_td_mspbe = np.mean(error_log['batch td mspbe'], axis=0)
+        std_td_mspbe = np.std(error_log['batch td mspbe'], axis=0)
+        fig = plt.figure()
         plt.plot(xs, mean_tf_mspbe, label='$TF_{\theta}$')
         plt.fill_between(xs, mean_tf_mspbe - std_tf_mspbe,
                          mean_tf_mspbe + std_tf_mspbe, alpha=0.2)
-        plt.plot(xs, mean_tf_mspbe_hard, label='$TF^{"TD"}$')
-        plt.fill_between(xs, mean_tf_mspbe_hard - std_tf_mspbe_hard,
-                         mean_tf_mspbe_hard + std_tf_mspbe_hard, alpha=0.2)
-        plt.xlabel('# MDPs')
+        plt.plot(xs, mean_td_mspbe, label='$TD$')
+        plt.fill_between(xs, mean_td_mspbe - std_td_mspbe,
+                         mean_td_mspbe + std_td_mspbe, alpha=0.2)
+        plt.xlabel('# MRPS')
         plt.ylabel('MSPBE')
         plt.ylim(0)
         plt.title(f"{transformer_title}\n MSPBE")
         plt.legend(frameon=True, framealpha=0.8,
                    fontsize='small').set_alpha(0.5)
         plt.savefig(os.path.join(error_dir, 'mspbe.png'), dpi=300)
-        plt.close()
+        plt.close(fig)
 
     # Value function similarity
     mean_vf_sim = np.mean(error_log['v_tf v_td msve'], axis=0)
     std_vf_sim = np.std(error_log['v_tf v_td msve'], axis=0)
     mean_zo_cos_sim = np.mean(error_log['zero order cos sim'], axis=0)
     std_zo_cos_sim = np.std(error_log['zero order cos sim'], axis=0)
-    mean_fo_cos_sim = np.mean(error_log['first order cos sim'], axis=0)
-    std_fo_cos_sim = np.std(error_log['first order cos sim'], axis=0)
     mean_sensitivity_cos_sim = np.mean(error_log['sensitivity cos sim'], axis=0)
     std_sensitivity_cos_sim = np.std(error_log['sensitivity cos sim'], axis=0)
-
 
     plt.figure()
     fig, ax1 = plt.subplots()
     plt.title(f"{transformer_title} \n and Batch TD Value Function Comparison")
-    ax1.set_xlabel('# MDPs')
+    ax1.set_xlabel('# MRPS')
     ax1.set_ylabel('Cosine Similarity')
     ax1.set_ylim(-0.3, 1.2)
-    c, = ax1.plot(xs, mean_zo_cos_sim, label='0 Order cos sim', color=sns.color_palette()[0])
+    c, = ax1.plot(xs, mean_zo_cos_sim, label='0 Order cos sim',
+                  color=sns.color_palette()[0])
     ax1.fill_between(xs, mean_zo_cos_sim - std_zo_cos_sim,
                      mean_zo_cos_sim + std_zo_cos_sim, lw=0, alpha=0.2, color=sns.color_palette()[0])
-    a, = ax1.plot(xs, mean_sensitivity_cos_sim, label='model cos sim', color=sns.color_palette()[2])
+    a, = ax1.plot(xs, mean_sensitivity_cos_sim,
+                  label='model cos sim', color=sns.color_palette()[2])
     ax1.fill_between(xs, mean_sensitivity_cos_sim - std_sensitivity_cos_sim,
                      mean_sensitivity_cos_sim + std_sensitivity_cos_sim, lw=0, alpha=0.2, color=sns.color_palette()[2])
     ax2 = ax1.twinx()
@@ -305,47 +303,50 @@ def plot_error_data(xs: np.ndarray,
     ax2.fill_between(xs, mean_vf_sim - std_vf_sim,
                      mean_vf_sim + std_vf_sim, lw=0, alpha=0.2, color=sns.color_palette()[1])
     ax2.tick_params(axis='y')
-    #ax1.set_zorder(ax2.get_zorder() + 1) # bring axis 1 to the front
+    # ax1.set_zorder(ax2.get_zorder() + 1) # bring axis 1 to the front
     p = [a, b, c]
     ax2.legend(p, [p_.get_label() for p_ in p], frameon=True, framealpha=0.8,
-                            fontsize='small', loc='center right')
+               fontsize='small', loc='center right')
     fig.tight_layout()
     plt.savefig(os.path.join(error_dir, 'cos_similarity.png'), dpi=300)
-    plt.close()
+    plt.close(fig)
 
     # Smoothed version of the above plot
     mean_vf_sim_smooth = smooth_data(mean_vf_sim, 5)
     mean_zo_cos_sim_smooth = smooth_data(mean_zo_cos_sim, 5)
-    mean_fo_cos_sim_smooth = smooth_data(mean_fo_cos_sim, 5)
     mean_sensitivity_cos_sim_smooth = smooth_data(mean_sensitivity_cos_sim, 5)
 
     plt.figure()
     fig, ax1 = plt.subplots()
-    plt.title(f"TF(mode={params['mode']} L={params['l']}, v rep={params['sample_weight']}) and Batch TD \n Predicted Value Function Comparison")
-    ax1.set_xlabel('# MDPs')
+    plt.title(
+        f"TF(mode={params['mode']} L={params['l']}, v rep={params['sample_weight']}) and Batch TD \n Predicted Value Function Comparison")
+    ax1.set_xlabel('# MRPS')
     ax1.set_ylabel('Cosine Similarity')
     ax1.set_ylim(-0.3, 1.2)
-    c, = ax1.plot(xs, mean_zo_cos_sim_smooth, label='0th Order', color=sns.color_palette()[0])
+    c, = ax1.plot(xs, mean_zo_cos_sim_smooth, label='0th Order',
+                  color=sns.color_palette()[0])
     ax1.fill_between(xs, mean_zo_cos_sim_smooth - std_zo_cos_sim,
                      mean_zo_cos_sim_smooth + std_zo_cos_sim, lw=0, alpha=0.2, color=sns.color_palette()[0])
-    a, = ax1.plot(xs, mean_sensitivity_cos_sim_smooth, label='Sensitivity', color=sns.color_palette()[3])
+    a, = ax1.plot(xs, mean_sensitivity_cos_sim_smooth,
+                  label='Sensitivity', color=sns.color_palette()[3])
     ax1.fill_between(xs, mean_sensitivity_cos_sim_smooth - std_sensitivity_cos_sim,
                      mean_sensitivity_cos_sim_smooth + std_sensitivity_cos_sim, lw=0, alpha=0.2, color=sns.color_palette()[3])
 
     ax2 = ax1.twinx()
     ax2.set_ylabel('MSVE')
-    b, = ax2.plot(xs, mean_vf_sim_smooth, label='MSVE', color=sns.color_palette()[1])
+    b, = ax2.plot(xs, mean_vf_sim_smooth, label='MSVE',
+                  color=sns.color_palette()[1])
     ax2.fill_between(xs, mean_vf_sim_smooth - std_vf_sim,
                      mean_vf_sim_smooth + std_vf_sim, lw=0, alpha=0.2, color=sns.color_palette()[1])
 
     ax2.tick_params(axis='y')
-    ax1.set_zorder(ax2.get_zorder() + 1) # bring axis 1 to the front
+    ax1.set_zorder(ax2.get_zorder() + 1)  # bring axis 1 to the front
     p = [a, b, c]
     ax1.legend(p, [p_.get_label() for p_ in p], frameon=True, framealpha=0.8,
-                            fontsize='small')
+               fontsize='small')
     fig.tight_layout()
     plt.savefig(os.path.join(error_dir, 'cos_similarity_smooth.png'), dpi=300)
-    plt.close()
+    plt.close(fig)
 
 
 def plot_attention_params(xs: np.ndarray,
@@ -376,9 +377,9 @@ def plot_attention_params(xs: np.ndarray,
         Q = scale(Q)
         fig, axs = plt.subplots(nrows=1, ncols=2, figsize=(10, 5), sharey=True)
         cax1 = axs[0].matshow(P, vmin=-1, vmax=1)
-        axs[0].set_title(f'Layer {l+1} P Matrix at MDP {step}')
+        axs[0].set_title(f'Layer {l+1} P Matrix at MRP {step}')
         axs[1].matshow(Q, vmin=-1, vmax=1)
-        axs[1].set_title(f'Layer {l+1} Q Matrix at MDP {step}')
+        axs[1].set_title(f'Layer {l+1} Q Matrix at MRP {step}')
         fig.colorbar(cax1, ax=axs, orientation='vertical')
         axs[0].tick_params(axis='both', which='both',
                            bottom=False, top=False, left=False, right=False)
@@ -393,9 +394,9 @@ def plot_attention_params(xs: np.ndarray,
         alphas = params['alpha']
         fig = plt.figure(figsize=(10, 5))
         plt.plot(xs, alphas)
-        plt.xlabel('# MDPs')
+        plt.xlabel('# MRPS')
         plt.ylabel('Alpha')
-        plt.title('Alpha vs # MDPs')
+        plt.title('Alpha vs # MRPS')
         plt.savefig(os.path.join(attn_dir, 'alpha.png'))
         plt.close(fig)
 
@@ -456,7 +457,7 @@ def plot_weight_metrics(xs: np.ndarray,
     plt.style.use(['science', 'ieee', 'no-latex'])
     # same layer, different metrics
     for i in range(l):
-        plt.figure()
+        fig = plt.figure()
         for key, metric in P_metrics.items():
             # if sequential, add layer number to the label and title
             if params['mode'] == 'sequential':
@@ -483,32 +484,32 @@ def plot_weight_metrics(xs: np.ndarray,
             plt.plot(xs, mean_metric[:, i], label=label)
             plt.fill_between(xs, mean_metric[:, i] - std_metric[:, i],
                              mean_metric[:, i] + std_metric[:, i], alpha=0.2)
-            plt.xlabel('# MDPs')
+            plt.xlabel('# MRPS')
             plt.legend(frameon=True, framealpha=0.8,
                        fontsize='small').set_alpha(0.5)
         plt.savefig(os.path.join(P_metrics_dir,
                     f'P_metrics_{i+1}.png'), dpi=300)
-        plt.close()
+        plt.close(fig)
 
     # same metric, different layers
     for key, metric in P_metrics.items():
         mean_metric = np.mean(metric, axis=0)  # shape (T, l)
         std_metric = np.std(metric, axis=0)
         assert mean_metric.shape == std_metric.shape
-        plt.figure()
+        fig = plt.figure()
         for i in range(l):
             plt.plot(xs, mean_metric[:, i], label=f'layer={i+1}')
             plt.fill_between(xs, mean_metric[:, i] - std_metric[:, i],
                              mean_metric[:, i] + std_metric[:, i], alpha=0.2)
-            plt.xlabel('# MDPs')
+            plt.xlabel('# MRPS')
             plt.title(f'Transformer P Matrix {key.replace("_", " ").title()}')
             plt.legend()
         plt.savefig(os.path.join(P_metrics_dir, f'P_{key}.png'), dpi=300)
-        plt.close()
+        plt.close(fig)
 
     # same layer, different metrics
     for i in range(l):
-        plt.figure()
+        fig = plt.figure()
         for key, metric in Q_metrics.items():
             # if sequential, add layer number to the label and title
             if params['mode'] == 'sequential':
@@ -539,28 +540,28 @@ def plot_weight_metrics(xs: np.ndarray,
             plt.plot(xs, mean_metric[:, i], label=label)
             plt.fill_between(xs, mean_metric[:, i] - std_metric[:, i],
                              mean_metric[:, i] + std_metric[:, i], alpha=0.2)
-            plt.xlabel('# MDPs')
+            plt.xlabel('# MRPS')
             plt.legend(frameon=True, framealpha=0.8,
                        fontsize='small').set_alpha(0.5)
         plt.savefig(os.path.join(Q_metrics_dir,
                     f'Q_metrics_{i+1}.png'), dpi=300)
-        plt.close()
+        plt.close(fig)
 
     # same metric, different layers
     for key, metric in Q_metrics.items():
         mean_metric = np.mean(metric, axis=0)
         std_metric = np.std(metric, axis=0)
         assert mean_metric.shape == std_metric.shape
-        plt.figure()
+        fig = plt.figure()
         for i in range(l):
             plt.plot(xs, mean_metric[:, i], label=f'layer={i+1}')
             plt.fill_between(xs, mean_metric[:, i] - std_metric[:, i],
                              mean_metric[:, i] + std_metric[:, i], alpha=0.2)
-            plt.xlabel('# MDPs')
+            plt.xlabel('# MRPS')
             plt.title(f'Transformer Q Matrix {key.replace("_", " ").title()}')
             plt.legend()
         plt.savefig(os.path.join(Q_metrics_dir, f'Q_{key}.png'), dpi=300)
-        plt.close()
+        plt.close(fig)
 
 
 def align_matrix_sign(Ps: np.ndarray, Qs: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
