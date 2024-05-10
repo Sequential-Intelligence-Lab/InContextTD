@@ -3,16 +3,16 @@ import json
 import os
 
 import numpy as np
-import torch
 import torch.optim as optim
 from tqdm import tqdm
 
 from experiment.model import HardLinearTransformer, Transformer
-from experiment.plotter import (generate_attention_params_gif, load_data,
-                                plot_attention_params, plot_mean_attn_params,
-                                plot_multiple_runs)
-from experiment.prompt import MDPPrompt, MDPPromptGenerator
-from experiment.utils import compute_msve, cos_sim, set_seed, zero_order_comparison
+from experiment.plotter import (load_data, plot_attention_params,
+                                plot_mean_attn_params, plot_multiple_runs)
+from experiment.prompt import MDPPromptGenerator
+from experiment.utils import (compare_sensitivity, compute_msve,
+                              first_order_comparison, set_seed,
+                              zero_order_comparison)
 from MRP.mrp import MRP
 
 
@@ -22,15 +22,16 @@ def _init_log() -> dict:
            'mstde': [],
            'mstde hard': [],
            'transformer msve': [],
+           'batch td msve': [],
+           'v_tf v_td msve': [],
            'zero order cos sim': [],
+           'zero order l2 dist': [],
            'first order cos sim': [],
+           'first order l2 dist': [],
            'sensitivity cos sim': [],
            'sensitivity l2 dist': [],
-           'value dist': [],
            'P': [],
-           'Q': [],
-            'v_tf v_td msve': []
-           }
+           'Q': []}
     return log
 
 
@@ -135,14 +136,11 @@ def train(d: int,
         if i % log_interval == 0:
             prompt.reset()  # reset prompt for fair testing
             mdp: MRP = prompt.mdp
-            Phi: np.ndarray = prompt.get_feature_mat().numpy()
             steady_d: np.ndarray = mdp.steady_d
             true_v: np.ndarray = mdp.v
             v_tf: np.ndarray = tf.fit_value_func(
                 prompt.context(), prompt.get_feature_mat()).detach().numpy()
-            w_td: np.ndarray = tf_hard.manual_weight_extraction(
-                prompt.context(), d).detach().numpy()
-            v_tf_hard: np.ndarray = tf_hard.fit_value_func(
+            v_td: np.ndarray = tf_hard.fit_value_func(
                 prompt.context(), prompt.get_feature_mat()).detach().numpy()
 
             log['xs'].append(i)
@@ -150,23 +148,22 @@ def train(d: int,
             log['mstde'].append(mstde.item())
             log['mstde hard'].append(mstde_hard.item())
 
-            tf_msve = compute_msve(v_tf, true_v, steady_d)
-            log['transformer msve'].append(tf_msve)
+            # all the value function square errors
+            log['transformer msve'].append(compute_msve(v_tf, true_v, steady_d))
+            log['batch td msve'].append(compute_msve(v_td, true_v, steady_d))
+            log['v_tf v_td msve'].append(compute_msve(v_tf, v_td, steady_d))
 
-
-            vf_sim = compute_msve(v_tf, v_tf_hard, steady_d)
-            log['v_tf v_td msve'].append(vf_sim)
-
-            zo_cos_sim= zero_order_comparison(v_tf, w_td,
-                                                           Phi, steady_d)
+            zo_cos_sim, zo_l2_dist = zero_order_comparison(v_tf, tf_hard, prompt)
             log['zero order cos sim'].append(zo_cos_sim)
+            log['zero order l2 dist'].append(zo_l2_dist)
 
-            fo_cos_sim = first_order_comparison(tf, tf_hard, prompt, Phi, steady_d)
+            fo_cos_sim, fo_l2_dist = first_order_comparison(tf, tf_hard, prompt)
             log['first order cos sim'].append(fo_cos_sim)
+            log['first order l2 dist'].append(fo_l2_dist)
 
-            sensitivity_cos_sim, l2_dist = compare_sensitivity(tf, tf_hard, prompt)
-            log['sensitivity cos sim'].append(sensitivity_cos_sim)
-            log['sensitivity l2 dist'].append(l2_dist)
+            sens_cos_sim, sens_l2_dist = compare_sensitivity(tf, tf_hard, prompt)
+            log['sensitivity cos sim'].append(sens_cos_sim)
+            log['sensitivity l2 dist'].append(sens_l2_dist)
 
             if mode == 'auto':
                 log['P'].append([tf.attn.P.detach().numpy().copy()])
@@ -202,61 +199,6 @@ def train(d: int,
     with open(os.path.join(save_dir, 'params.json'), 'w') as f:
         json.dump(hyperparameters, f)
 
-def compare_sensitivity(tf: Transformer, 
-                        tf_hard: HardLinearTransformer, 
-                        prompt: MDPPrompt):
-    '''
-    computes the cosine similarity and l2 norm between the transformers' gradients w.r.t query
-    '''
-    prompt.enable_query_grad()
-
-    tf_v = tf.pred_v(prompt.z())
-    tf_v.backward()
-    tf_grad = prompt.query_grad().numpy()
-    prompt.zero_query_grad()
-
-    tf_v_hard = tf_hard.pred_v(prompt.z())
-    tf_v_hard.backward()
-    tf_grad_hard = prompt.query_grad().numpy()
-    prompt.disable_query_grad()
-
-    l2_dist = np.linalg.norm(tf_grad - tf_grad_hard)
-    return cos_sim(tf_grad, tf_grad_hard), l2_dist
-
-def first_order_comparison(tf: Transformer,
-                           tf_hard: HardLinearTransformer,
-                           prompt: MDPPrompt,
-                           phi: np.ndarray,
-                           steady_dist: np.ndarray):
-    '''
-    computes the cosine similarity and l2 distance
-    between the first order approximation of the batch TD transformer
-    and the linear transformer
-    '''
-    first_order = 0.0
-    # loop over all the states in the state space
-    for s in range(phi.shape[0]):
-        prompt.set_query(torch.from_numpy(phi[s].reshape(-1, 1)))
-        # TF approximation
-        prompt.enable_query_grad()
-        tf_v = tf.pred_v(prompt.z())
-        tf_v.backward()
-        tf_grad = prompt.query_grad().numpy()
-        prompt.zero_query_grad()
-
-        # Hardcoded approximation
-        tf_v_hard = tf_hard.pred_v(prompt.z())
-        tf_v_hard.backward()
-        tf_grad_hard = prompt.query_grad().numpy()
-        prompt.disable_query_grad()
-
-        first_order_tf = np.concatenate([tf_grad.flatten(), [tf_v.item()]])
-        first_order_hard = np.concatenate([tf_grad_hard.flatten(), [tf_v_hard.item()]])
-
-        # compute the cosine similarity weighted by the stationary distribution
-        first_order += cos_sim(first_order_tf, first_order_hard)* steady_dist[s]
-    return first_order
-
 
 if __name__ == '__main__':
     from plotter import (compute_weight_metrics, plot_error_data,
@@ -269,8 +211,7 @@ if __name__ == '__main__':
     gamma = 0.9
     mode = 'auto'
     startTime = datetime.datetime.now()
-    save_dir = os.path.join(
-        './logs', "nonlinear_discounted_train", startTime.strftime("%Y-%m-%d-%H-%M-%S"))
+    save_dir = os.path.join('./logs', "nonlinear_discounted_train", startTime.strftime("%Y-%m-%d-%H-%M-%S"))
     data_dirs = []
     for seed in [38, 42, 99, 128, 256]:
         data_dir = os.path.join(save_dir, f'seed_{seed}')

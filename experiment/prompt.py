@@ -18,6 +18,11 @@ class Feature:
     def __call__(self, s: int):
         return self.phi[s]
 
+    def copy(self) -> 'Feature':
+        f = Feature(self.d, self.s)
+        f.phi = self.phi.copy()
+        return f
+
 
 class Prompt:
     def __init__(self,
@@ -141,14 +146,14 @@ class MDPPrompt:
 
     def enable_query_grad(self):
         self._query.requires_grad_(True)
-    
+
     def disable_query_grad(self):
         self._query.requires_grad_(False)
 
     def query_grad(self):
         assert self._query.grad is not None, "no gradient associated with the query"
         return self._query.grad.reshape((self.d, 1))
-    
+
     def zero_query_grad(self):
         self._query.grad = None
 
@@ -184,6 +189,15 @@ class MDPPrompt:
         v = new_w.t() @ self.phi[:, [-1]]
         return new_w, v.item()
 
+    def copy(self) -> 'MDPPrompt':
+        mdp_prompt = MDPPrompt(self.d, self.n, self.gamma,
+                               self.mdp.copy(), self.feature_fun.copy())
+        mdp_prompt.feature_window = self.feature_window.copy()
+        mdp_prompt.reward_window = self.reward_window.copy()
+        mdp_prompt.s = self.s
+        mdp_prompt._store_data()
+        return mdp_prompt
+
 
 class MDPPromptGenerator:
     def __init__(self,
@@ -205,7 +219,7 @@ class MDPPromptGenerator:
 
     def reset_mdp(self, sample_weight: bool = False):
         if sample_weight:
-            w = torch.rand(self.d, 1)
+            w = np.random.randn(self.d, 1)
             self.mdp = BoyanChain(n_states=self.s, gamma=self.gamma,
                                   weight=w, X=self.feat.phi)
         else:
@@ -237,9 +251,13 @@ if __name__ == '__main__':
     print(Z_1)
 
     prompt_gen.reset_feat()
-    prompt_gen.reset_mdp(sample_weight=False)
+    prompt_gen.reset_mdp(sample_weight=True)
     mdp_prompt = prompt_gen.get_prompt()
     Z_0 = mdp_prompt.reset()
     print(Z_0)
     Z_1 = mdp_prompt.step()
     print(Z_1)
+
+    pro = mdp_prompt.copy()
+    print(pro.mdp.w)
+    

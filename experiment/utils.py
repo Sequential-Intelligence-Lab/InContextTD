@@ -1,7 +1,8 @@
+from typing import Union
+
 import numpy as np
 import scipy as sp
 import torch
-from typing import Union
 
 
 def stack_four(A: torch.Tensor, B: torch.Tensor,
@@ -216,7 +217,7 @@ def in_context_learning_rate(P: np.ndarray,
 
 
 def cos_sim(v1: Union[torch.Tensor, np.ndarray],
-             v2: Union[torch.Tensor, np.ndarray]) -> float:
+            v2: Union[torch.Tensor, np.ndarray]) -> float:
     '''
     v1: vector 1
     v2: vector 2
@@ -231,17 +232,99 @@ def cos_sim(v1: Union[torch.Tensor, np.ndarray],
     v2 = v2.flatten()
     return np.dot(v1, v2) / (np.linalg.norm(v1) * np.linalg.norm(v2))
 
+
+def compare_sensitivity(tf,
+                        tf_hard,
+                        prompt):
+    '''
+    computes the expected cosine similarity and l2 norm 
+    between the transformers' gradients w.r.t query
+    '''
+    prompt = prompt.copy()
+    Phi: torch.Tensor = prompt.get_feature_mat()
+    steady_d: np.ndarray = prompt.mdp.steady_d
+    mean_cos_sim = 0.0
+    mean_l2_dist = 0.0
+    for s, feature in enumerate(Phi):
+        prompt.set_query(feature)
+        prompt.enable_query_grad()
+
+        tf_v = tf.pred_v(prompt.z())
+        tf_v.backward()
+        tf_grad = prompt.query_grad().numpy()
+        prompt.zero_query_grad()
+
+        tf_v_hard = tf_hard.pred_v(prompt.z())
+        tf_v_hard.backward()
+        tf_grad_hard = prompt.query_grad().numpy()
+        prompt.disable_query_grad()
+
+        mean_cos_sim += steady_d[s]*cos_sim(tf_grad, tf_grad_hard)
+        mean_l2_dist += steady_d[s]*np.linalg.norm(tf_grad - tf_grad_hard)
+    return mean_cos_sim, mean_l2_dist
+
+
 def zero_order_comparison(v_tf: np.ndarray,
-                          w_td: np.ndarray,
-                          Phi: np.ndarray,
-                          steady_dist: np.ndarray):
+                          tf_hard,
+                          prompt):
     '''
     computes the cosine similarity and l2 distance
     between the batch TD weight (with the fitted learning rate) 
     and the weight of the best linear model that explaines v_tf
     '''
-    w_tf = solve_msve_weight(steady_dist, Phi, v_tf)
-    return cos_sim(w_tf, w_td)
+    prompt = prompt.copy()
+    steady_d = prompt.mdp.steady_d
+    Phi = prompt.get_feature_mat().numpy()
+    w_tf = solve_msve_weight(steady_d, Phi, v_tf).flatten()
+    prompt.enable_query_grad()
+    v_td = tf_hard.pred_v(prompt.z())
+    v_td.backward()
+    w_td = prompt.query_grad().numpy().flatten()
+    prompt.zero_query_grad()
+    prompt.disable_query_grad()
+
+    return cos_sim(w_tf, w_td), np.linalg.norm(w_tf - w_td)
+
+
+def first_order_comparison(tf,
+                           tf_hard,
+                           prompt):
+    '''
+    computes the cosine similarity and l2 distance
+    between the first order approximation of the batch TD transformer
+    and the linear transformer
+    '''
+    prompt = prompt.copy()
+    Phi: torch.Tensor = prompt.get_feature_mat()
+    steady_d: np.ndarray = prompt.mdp.steady_d
+    mean_cos_sim = 0.0
+    mean_l2_dist = 0.0
+    # loop over all the features
+    for s, feature in enumerate(Phi):
+        prompt.set_query(feature)
+        # TF approximation
+        prompt.enable_query_grad()
+        tf_v = tf.pred_v(prompt.z())
+        tf_v.backward()
+        tf_grad = prompt.query_grad().numpy()
+        prompt.zero_query_grad()
+
+        # Hardcoded approximation
+        tf_v_hard = tf_hard.pred_v(prompt.z())
+        tf_v_hard.backward()
+        tf_grad_hard = prompt.query_grad().numpy()
+        prompt.disable_query_grad()
+
+        first_order_tf = np.concatenate([tf_grad.flatten(), [tf_v.item()]])
+        first_order_hard = np.concatenate(
+            [tf_grad_hard.flatten(), [tf_v_hard.item()]])
+
+        # compute the cosine similarity weighted by the stationary distribution
+        mean_cos_sim += cos_sim(first_order_tf, first_order_hard) * steady_d[s]
+        mean_l2_dist += np.linalg.norm(first_order_tf -
+                                       first_order_hard) * steady_d[s]
+    return mean_cos_sim, mean_l2_dist
+
 
 def smooth_data(data: np.ndarray, window_size: int) -> np.ndarray:
     '''
@@ -254,6 +337,7 @@ def smooth_data(data: np.ndarray, window_size: int) -> np.ndarray:
     window = np.ones(int(window_size))/float(window_size)
     smoothed_data = np.convolve(padded_data, window, 'valid')
     return smoothed_data
+
 
 if __name__ == '__main__':
     from MRP.boyan import BoyanChain
