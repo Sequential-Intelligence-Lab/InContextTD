@@ -192,7 +192,8 @@ def train(d: int,
         'log_interval': log_interval,
         'random_seed': random_seed,
         'mode': mode,
-        'linear': False
+        'linear': False,
+        'act': activation
     }
 
     # Save hyperparameters as JSON

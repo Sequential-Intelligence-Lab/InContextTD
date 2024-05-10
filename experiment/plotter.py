@@ -37,17 +37,15 @@ def process_log(log: dict) -> Tuple[np.ndarray, dict, dict]:
     error_log = {}
     for key in ('mstde',
                 'mstde hard',
-                'msve weight error norm',
-                'msve weight error norm hard',
-                'mspbe weight error norm',
-                'mspbe weight error norm hard',
                 'true msve',
                 'transformer msve',
                 'transformer msve hard',
                 'transformer mspbe',
                 'transformer mspbe hard',
                 'zero order cos sim',
+                'zero order l2 dist',
                 'first order cos sim',
+                'first order l2 dist',
                 'sensitivity cos sim',
                 'sensitivity l2 dist',
                 'v_tf v_td msve'):
@@ -189,6 +187,24 @@ def plot_error_data(xs: np.ndarray,
     if not os.path.exists(error_dir):
         os.makedirs(error_dir)
 
+    # specify that there is no activation function for linear transformers
+    if params['linear'] == True:
+        params['act'] = 'None'
+
+    # abbreviate the labels for plotting
+    if params['mode'] == 'sequential':
+        mode = 'seq'
+    else:
+        mode = 'auto'
+
+    if params['sample_weight'] == True:
+        sample_weight = 'rep'
+    else:
+        sample_weight = 'nonrep'
+
+    transformer_title = f"TF(mode={mode} L={params['l']}, act={params['act']}, vf={sample_weight})"
+
+    # set plotting style (ieee supports color blindness)
     plt.style.use(['science', 'ieee', 'no-latex'])
 
     # MSTDE
@@ -205,87 +221,37 @@ def plot_error_data(xs: np.ndarray,
                      mean_mstde_hard + std_mstde_hard, alpha=0.2)
     plt.xlabel('# MDPs')
     plt.ylabel('Loss (MSTDE)')
-    plt.title('Loss (MSTDE) vs # MDPs')
+    plt.title(f'{transformer_title}\n Training Loss (MSTDE)')
     plt.legend()
     plt.savefig(os.path.join(error_dir, 'loss_mstde.png'), dpi=300)
     plt.close()
 
-    if params['linear']:
-        # Weight norm
-        mean_msve_weight_error_norm = np.mean(
-            error_log['msve weight error norm'], axis=0)
-        mean_mspbe_weight_error_norm = np.mean(
-            error_log['mspbe weight error norm'], axis=0)
-        std_msve_weight_error_norm = np.std(
-            error_log['msve weight error norm'], axis=0)
-        std_mspbe_weight_error_norm = np.std(
-            error_log['mspbe weight error norm'], axis=0)
-        mean_msve_weight_error_norm_hard = np.mean(
-            error_log['msve weight error norm hard'], axis=0)
-        mean_mspbe_weight_error_norm_hard = np.mean(
-            error_log['mspbe weight error norm hard'], axis=0)
-        std_msve_weight_error_norm_hard = np.std(
-            error_log['msve weight error norm hard'], axis=0)
-        std_mspbe_weight_error_norm_hard = np.std(
-            error_log['mspbe weight error norm hard'], axis=0)
-        plt.figure()
-        plt.plot(xs, mean_msve_weight_error_norm, label='MSVE WEN')
-        plt.fill_between(xs, mean_msve_weight_error_norm - std_msve_weight_error_norm,
-                         mean_msve_weight_error_norm + std_msve_weight_error_norm, alpha=0.2)
-        plt.plot(xs, mean_mspbe_weight_error_norm, label='MSPBE WEN')
-        plt.fill_between(xs, mean_mspbe_weight_error_norm - std_mspbe_weight_error_norm,
-                         mean_mspbe_weight_error_norm + std_mspbe_weight_error_norm, alpha=0.2)
-        plt.plot(xs, mean_msve_weight_error_norm_hard, label='MSVE WEN Hard')
-        plt.fill_between(xs, mean_msve_weight_error_norm_hard - std_msve_weight_error_norm_hard,
-                         mean_msve_weight_error_norm_hard + std_msve_weight_error_norm_hard, alpha=0.2)
-        plt.plot(xs, mean_mspbe_weight_error_norm_hard, label='MSPBE WEN Hard')
-        plt.fill_between(xs, mean_mspbe_weight_error_norm_hard - std_mspbe_weight_error_norm_hard,
-                         mean_mspbe_weight_error_norm_hard + std_mspbe_weight_error_norm_hard, alpha=0.2)
-        plt.xlabel('# MDPs')
-        plt.ylabel('Weight Error L2 Norm')
-        plt.title('Weight Error Norm vs # MDPs')
-        plt.legend()
-        plt.savefig(os.path.join(error_dir, 'weight_error_norm.png'), dpi=300)
-        plt.close()
-
     # Value error
-    if params['linear']:
-        mean_true_msve = np.mean(error_log['true msve'], axis=0)
-        mean_tf_msve = np.mean(error_log['transformer msve'], axis=0)
-        mean_tf_msve_hard = np.mean(error_log['transformer msve hard'], axis=0)
-        std_true_msve = np.std(error_log['true msve'], axis=0)
-        std_tf_msve = np.std(error_log['transformer msve'], axis=0)
-        std_tf_msve_hard = np.std(error_log['transformer msve hard'], axis=0)
+    mean_tf_msve = np.mean(error_log['transformer msve'], axis=0)
+    std_tf_msve = np.std(error_log['transformer msve'], axis=0)
 
-        plt.figure()
+    plt.figure()
+    plt.plot(xs, mean_tf_msve, label='TF')
+    plt.fill_between(xs, mean_tf_msve - std_tf_msve,
+                        mean_tf_msve + std_tf_msve, alpha=0.2)
+    if params['linear']:
+        mean_tf_msve_hard = np.mean(error_log['transformer msve hard'], axis=0)
+        std_tf_msve_hard = np.std(error_log['transformer msve hard'], axis=0)
+        mean_true_msve = np.mean(error_log['true msve'], axis=0)
+        std_true_msve = np.std(error_log['true msve'], axis=0)
+
+        plt.plot(xs, mean_tf_msve_hard, label='$TF^{"TD"}$')
+        plt.fill_between(xs, mean_tf_msve_hard - std_tf_msve_hard,
+                            mean_tf_msve_hard + std_tf_msve_hard, alpha=0.2)
         plt.plot(xs, mean_true_msve, label='True')
         plt.fill_between(xs, mean_true_msve - std_true_msve,
-                         mean_true_msve + std_true_msve, alpha=0.2)
-        plt.plot(xs, mean_tf_msve, label='TF')
-        plt.fill_between(xs, mean_tf_msve - std_tf_msve,
-                         mean_tf_msve + std_tf_msve, alpha=0.2)
-        plt.plot(xs, mean_tf_msve_hard, label='TF Hard')
-        plt.fill_between(xs, mean_tf_msve_hard - std_tf_msve_hard,
-                         mean_tf_msve_hard + std_tf_msve_hard, alpha=0.2)
-        plt.xlabel('# MDPs')
-        plt.ylabel('MSVE')
-        plt.title('MSVE vs # MDPs')
-        plt.legend()
-        plt.savefig(os.path.join(error_dir, 'msve.png'), dpi=300)
-        plt.close()
-    else:  # we can only compute msve for nonlinear TF
-        mean_tf_msve = np.mean(error_log['transformer msve'], axis=0)
-        std_tf_msve = np.std(error_log['transformer msve'], axis=0)
-        plt.figure()
-        plt.plot(xs, mean_tf_msve, label='Transformer MSVE')
-        plt.fill_between(xs, mean_tf_msve - std_tf_msve,
-                         mean_tf_msve + std_tf_msve, alpha=0.2)
-        plt.xlabel('# MDPs')
-        plt.ylabel('MSVE')
-        plt.title('MSVE vs # MDPs')
-        plt.legend()
-        plt.savefig(os.path.join(error_dir, 'msve.png'), dpi=300)
-        plt.close()
+                            mean_true_msve + std_true_msve, alpha=0.2)
+    plt.xlabel('# MDPs')
+    plt.ylabel('MSVE')
+    plt.title(f'{transformer_title}\n MSVE vs # MDPs')
+    plt.legend()
+    plt.savefig(os.path.join(error_dir, 'msve.png'), dpi=300)
+    plt.close()
 
     if params['linear']:  # MSPBE only computable for linear TF
         # MSPBE
@@ -295,16 +261,16 @@ def plot_error_data(xs: np.ndarray,
             error_log['transformer mspbe hard'], axis=0)
         std_tf_mspbe_hard = np.std(error_log['transformer mspbe hard'], axis=0)
         plt.figure()
-        plt.plot(xs, mean_tf_mspbe, label='Learned TF')
+        plt.plot(xs, mean_tf_mspbe, label='$TF_{\theta}$')
         plt.fill_between(xs, mean_tf_mspbe - std_tf_mspbe,
                          mean_tf_mspbe + std_tf_mspbe, alpha=0.2)
-        plt.plot(xs, mean_tf_mspbe_hard, label='Batch TD TF')
+        plt.plot(xs, mean_tf_mspbe_hard, label='$TF^{"TD"}$')
         plt.fill_between(xs, mean_tf_mspbe_hard - std_tf_mspbe_hard,
                          mean_tf_mspbe_hard + std_tf_mspbe_hard, alpha=0.2)
         plt.xlabel('# MDPs')
         plt.ylabel('MSPBE')
         plt.ylim(0)
-        plt.title(f"TF(mode={params['mode']} L={params['l']}, v_rep={params['sample_weight']}) MSPBE")
+        plt.title(f"{transformer_title}\n MSPBE")
         plt.legend(frameon=True, framealpha=0.8,
                    fontsize='small').set_alpha(0.5)
         plt.savefig(os.path.join(error_dir, 'mspbe.png'), dpi=300)
@@ -320,13 +286,38 @@ def plot_error_data(xs: np.ndarray,
     mean_sensitivity_cos_sim = np.mean(error_log['sensitivity cos sim'], axis=0)
     std_sensitivity_cos_sim = np.std(error_log['sensitivity cos sim'], axis=0)
 
-    # are you allowed to just smooth the standard deviations like that?
+
+    plt.figure()
+    fig, ax1 = plt.subplots()
+    plt.title(f"{transformer_title} \n and Batch TD Value Function Comparison")
+    ax1.set_xlabel('# MDPs')
+    ax1.set_ylabel('Cosine Similarity')
+    ax1.set_ylim(-0.3, 1.2)
+    c, = ax1.plot(xs, mean_zo_cos_sim, label='0 Order cos sim', color=sns.color_palette()[0])
+    ax1.fill_between(xs, mean_zo_cos_sim - std_zo_cos_sim,
+                     mean_zo_cos_sim + std_zo_cos_sim, lw=0, alpha=0.2, color=sns.color_palette()[0])
+    a, = ax1.plot(xs, mean_sensitivity_cos_sim, label='model cos sim', color=sns.color_palette()[2])
+    ax1.fill_between(xs, mean_sensitivity_cos_sim - std_sensitivity_cos_sim,
+                     mean_sensitivity_cos_sim + std_sensitivity_cos_sim, lw=0, alpha=0.2, color=sns.color_palette()[2])
+    ax2 = ax1.twinx()
+    ax2.set_ylabel('TF and Batch TD MSVE')
+    b, = ax2.plot(xs, mean_vf_sim, label='MSVE', color=sns.color_palette()[1])
+    ax2.fill_between(xs, mean_vf_sim - std_vf_sim,
+                     mean_vf_sim + std_vf_sim, lw=0, alpha=0.2, color=sns.color_palette()[1])
+    ax2.tick_params(axis='y')
+    #ax1.set_zorder(ax2.get_zorder() + 1) # bring axis 1 to the front
+    p = [a, b, c]
+    ax2.legend(p, [p_.get_label() for p_ in p], frameon=True, framealpha=0.8,
+                            fontsize='small', loc='center right')
+    fig.tight_layout()
+    plt.savefig(os.path.join(error_dir, 'cos_similarity.png'), dpi=300)
+    plt.close()
+
+    # Smoothed version of the above plot
     mean_vf_sim_smooth = smooth_data(mean_vf_sim, 5)
     mean_zo_cos_sim_smooth = smooth_data(mean_zo_cos_sim, 5)
     mean_fo_cos_sim_smooth = smooth_data(mean_fo_cos_sim, 5)
     mean_sensitivity_cos_sim_smooth = smooth_data(mean_sensitivity_cos_sim, 5)
-
-
 
     plt.figure()
     fig, ax1 = plt.subplots()
@@ -354,32 +345,6 @@ def plot_error_data(xs: np.ndarray,
                             fontsize='small')
     fig.tight_layout()
     plt.savefig(os.path.join(error_dir, 'cos_similarity_smooth.png'), dpi=300)
-    plt.close()
-
-    plt.figure()
-    fig, ax1 = plt.subplots()
-    plt.title(f"TF(mode={params['mode']} L={params['l']}, v rep={params['sample_weight']}) and Batch TD \n Predicted Value Function Comparison")
-    ax1.set_xlabel('# MDPs')
-    ax1.set_ylabel('Cosine Similarity')
-    ax1.set_ylim(-0.3, 1.2)
-    c, = ax1.plot(xs, mean_zo_cos_sim, label='0th Order', color=sns.color_palette()[0])
-    ax1.fill_between(xs, mean_zo_cos_sim - std_zo_cos_sim,
-                     mean_zo_cos_sim + std_zo_cos_sim, lw=0, alpha=0.2, color=sns.color_palette()[0])
-    a, = ax1.plot(xs, mean_sensitivity_cos_sim, label='Sensitivity', color=sns.color_palette()[2])
-    ax1.fill_between(xs, mean_sensitivity_cos_sim - std_sensitivity_cos_sim,
-                     mean_sensitivity_cos_sim + std_sensitivity_cos_sim, lw=0, alpha=0.2, color=sns.color_palette()[2])
-    ax2 = ax1.twinx()
-    ax2.set_ylabel('MSVE')
-    b, = ax2.plot(xs, mean_vf_sim, label='MSVE', color=sns.color_palette()[1])
-    ax2.fill_between(xs, mean_vf_sim - std_vf_sim,
-                     mean_vf_sim + std_vf_sim, lw=0, alpha=0.2, color=sns.color_palette()[1])
-    ax2.tick_params(axis='y')
-    #ax1.set_zorder(ax2.get_zorder() + 1) # bring axis 1 to the front
-    p = [a, b, c]
-    ax2.legend(p, [p_.get_label() for p_ in p], frameon=True, framealpha=0.8,
-                            fontsize='small', loc='center right')
-    fig.tight_layout()
-    plt.savefig(os.path.join(error_dir, 'cos_similarity.png'), dpi=300)
     plt.close()
 
 
@@ -671,7 +636,7 @@ def compute_weight_metrics(attn_params: dict,
 
 if __name__ == '__main__':
     runs_directory = os.path.join(
-        './logs', 'linear_discounted_train', '2024-05-09-09-42-13')
+        './logs', 'nonlinear_discounted_train', '2024-05-10-01-06-39_standard')
     runs_to_plot = [run for run in os.listdir(
         runs_directory) if run.startswith('seed')]
     plot_multiple_runs([os.path.join(runs_directory, run)
