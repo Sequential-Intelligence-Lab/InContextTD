@@ -160,4 +160,5 @@ cython_debug/
 #.idea/
 
 logs
+plot.py
 .DS_Store
