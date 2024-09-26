@@ -46,7 +46,7 @@ if __name__ == '__main__':
     parser.add_argument('--mode', type=str,
                         help='training mode: auto-regressive or sequential', default='auto', choices=['auto', 'sequential'])
     parser.add_argument('--seed', type=int, nargs='+',
-                        help='random seed', default=[1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
+                        help='random seed', default=list(range(11, 31)))
     parser.add_argument('--save_dir', type=str,
                         help='directory to save logs', default=None)
     parser.add_argument('--suffix', type=str,
@@ -122,11 +122,11 @@ if __name__ == '__main__':
             train_args['activation'] = args.activation
             nonlinear_train(**train_args)
 
-        # log, hyperparams = load_data(data_dir)
-        # xs, error_log, attn_params = process_log(log)
-        # l_tf = args.num_layers if args.mode == 'sequential' else 1
-        # plot_error_data(xs, error_log, save_dir=data_dir, params=hyperparams)
-        # plot_attention_params(xs, attn_params, save_dir=data_dir)
+        log, hyperparams = load_data(data_dir)
+        xs, error_log, attn_params = process_log(log)
+        l_tf = args.num_layers if args.mode == 'sequential' else 1
+        plot_error_data(xs, error_log, save_dir=data_dir, params=hyperparams)
+        plot_attention_params(xs, attn_params, save_dir=data_dir)
         # if args.gen_gif:
         #     generate_attention_params_gif(xs, l_tf, attn_params, data_dir)
         # if args.linear:
@@ -137,4 +137,4 @@ if __name__ == '__main__':
         #     plot_weight_metrics(xs, l_tf, P_metrics, Q_metrics,
         #                         data_dir, hyperparams)
     # plot_multiple_runs(data_dirs, save_dir=save_dir)
-    # plot_mean_attn_params(data_dirs, save_dir=save_dir)
+    plot_mean_attn_params(data_dirs, save_dir=save_dir)

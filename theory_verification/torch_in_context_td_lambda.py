@@ -1,8 +1,8 @@
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 import numpy as np
-import math
+
+torch.set_default_dtype(torch.float64)
 
 def stack_four(A, B, C, D):
     top = torch.cat([A, B], dim=1)
@@ -45,7 +45,7 @@ class Transformer(nn.Module):
         v = []
         for layer in self.layers:
             Z = layer.forward(Z)
-            v.append(Z[-1, -1].item())
+            v.append(-Z[-1, -1].item())
         return v, Z
 
 class Prompt:
@@ -93,13 +93,26 @@ def verify(d, n, l, lmbd):
     tf = Transformer(l, d, n, lmbd)
     pro = Prompt(d, n, gamma, lmbd)
     tf_value, _ = tf.forward(pro.z())
+    tf_value = np.array(tf_value)
+
     w = torch.zeros((d, 1))
     td_value = []
     for i in range(l):
         w, v = pro.td_update(w, tf.Cs[i])
         td_value.append(v)
     td_value = np.array(td_value).flatten()
-    print(tf_value + td_value)
+    
+    return np.absolute(tf_value - td_value)
 
 if __name__ == '__main__':
-    verify(4, 9, 10, 0.5)
+    import os
+    from tqdm import tqdm
+    errors = []
+    for seed in tqdm(range(1, 31)):
+        torch.manual_seed(seed)
+        np.random.seed(seed)
+        error = verify(3, 100, 40, 0.5)
+        errors.append(error)
+    errors = np.array(errors)
+    save_path = os.path.join('logs', 'theory', 'discounted_td_lambda.npy')
+    np.save(save_path, errors)

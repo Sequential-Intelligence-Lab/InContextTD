@@ -283,8 +283,8 @@ def plot_error_data(xs: np.ndarray,
     mean_sensitivity_cos_sim = np.mean(error_log['sensitivity cos sim'], axis=0)
     std_sensitivity_cos_sim = np.std(error_log['sensitivity cos sim'], axis=0)
 
-    plt.figure()
-    fig, ax1 = plt.subplots()
+    fig = plt.figure()
+    _, ax1 = plt.subplots()
     plt.title(f"{transformer_title} \n and Batch TD Value Function Comparison")
     ax1.set_xlabel('# MRPS')
     ax1.set_ylabel('Cosine Similarity')
@@ -317,8 +317,8 @@ def plot_error_data(xs: np.ndarray,
     mean_zo_cos_sim_smooth = smooth_data(mean_zo_cos_sim, 5)
     mean_sensitivity_cos_sim_smooth = smooth_data(mean_sensitivity_cos_sim, 5)
 
-    plt.figure()
-    fig, ax1 = plt.subplots()
+    fig = plt.figure()
+    _, ax1 = plt.subplots()
     plt.title(
         f"TF(mode={params['mode']} L={params['l']}, v rep={params['sample_weight']}) and Batch TD \n Predicted Value Function Comparison")
     ax1.set_xlabel('# MRPS')
@@ -334,7 +334,7 @@ def plot_error_data(xs: np.ndarray,
 
     ax2 = ax1.twinx()
     ax2.set_ylabel('MSVE')
-    ax2.set_ylim(0, 2.5)
+    ax2.set_ylim(0, 0.5)
     b, = ax2.plot(xs, mean_vf_sim_smooth, label='MSVE', color=sns.color_palette()[1], linestyle='dashdot')
     ax2.fill_between(xs, mean_vf_sim_smooth - std_vf_sim,
                      mean_vf_sim_smooth + std_vf_sim, lw=0, alpha=0.2, color=sns.color_palette()[1])
