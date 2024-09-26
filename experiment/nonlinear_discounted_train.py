@@ -104,7 +104,7 @@ def train(d: int,
     pro_gen = MDPPromptGenerator(s, d, n, gamma)
 
     ### Training Loop ###
-    for i in tqdm(range(1, n_mdps+1)):
+    for i in tqdm(range(1, n_mdps+1), mininterval=300):
         pro_gen.reset_feat()  # reset feature
         pro_gen.reset_mdp(sample_weight=sample_weight)  # reset MDP
         prompt = pro_gen.get_prompt()  # get prompt object

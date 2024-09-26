@@ -19,11 +19,13 @@ class TFLayer:
         self.M2 = stack_four(I, O, O, O)
         self.C = np.eye(d) 
         self.B = stack_four(self.C.T, O, O, O)
-        self.A = self.B @ self.M1
+        if semi_grad:
+            self.A = self.B @ self.M1
+        else:
+            self.A = -self.M1.T @ self.B @ self.M1
         self.Q = np.zeros(self.P.shape)
         self.Q[:2*d, :2*d] = self.A
-        if not semi_grad:
-            self.Q = self.Q.T
+
     
     def forward(self, Z):
         next_Z = Z + 1.0 / self.n * self. P @ Z @ self.M @ Z.T @ self.Q @ Z
@@ -101,7 +103,7 @@ def verify(d, n, l, semi_grad = True):
 if __name__ == '__main__':
     verify(4, 9, 5)
     # verify residual gradient
-    verify(4,9, 1, semi_grad=False)
+    verify(4,9, 5, semi_grad=False)
 
 
 

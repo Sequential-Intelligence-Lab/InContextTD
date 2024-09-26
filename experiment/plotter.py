@@ -65,7 +65,8 @@ def _batch_runs(logs: List[dict]) -> dict:
 
 
 def plot_multiple_runs(data_dirs: List[str],
-                       save_dir: str) -> None:
+                       save_dir: str,
+                       final_figures_dir: str) -> None:
     '''
     data_dirs: list of directories containing the data
     save_dir: directory to save the plots
@@ -99,21 +100,23 @@ def plot_multiple_runs(data_dirs: List[str],
             Q_metrics_lst.append(Q_metrics)
 
     batched_error_log = _batch_runs(error_log_lst)
-    plot_error_data(xs, batched_error_log, save_dir, params)
+    plot_error_data(xs, batched_error_log, save_dir, final_figures_dir, params)
 
     if is_linear:
         batched_Q_metrics = _batch_runs(Q_metrics_lst)
         batched_P_metrics = _batch_runs(P_metrics_lst)
         plot_weight_metrics(xs, l, batched_P_metrics,
-                            batched_Q_metrics, save_dir, params)
+                            batched_Q_metrics, save_dir, final_figures_dir, params)
 
 
 def plot_mean_attn_params(data_dirs: List[str],
                           save_dir: str,
+                          final_figures_dir: str,
                           log_step: int = -1) -> None:
     '''
     data_dirs: list of directories containing the data
-    save_dir: directory to save the plots
+    save_dir: directory to save the plots not in the final paper
+    final_figures_dir: directory to save the final figures for the paper
     log_step: time step to visualize
     '''
     attn_dir = os.path.join(save_dir, 'mean_attention_params_plots')
@@ -144,12 +147,12 @@ def plot_mean_attn_params(data_dirs: List[str],
         cax1 = axs[0].matshow(P, vmin=-1, vmax=1)
         if hypers['mode'] == 'sequential':
             axs[0].set_title(
-                f'Mean Layer {l+1} P Matrix at MRP {step}', fontsize=16)
+                f'Final $P_{l}$', fontsize=26)
             axs[1].set_title(
-                f'Mean Layer {l+1} Q Matrix at MRP {step}', fontsize=16)
+                f'Final $Q_{l}$', fontsize=26)
         else:
-            axs[0].set_title(f'Mean P Matrix at MRP {step}', fontsize=16)
-            axs[1].set_title(f'Mean Q Matrix at MRP {step}', fontsize=16)
+            axs[0].set_title(f'Final $P_{0}$', fontsize=26)
+            axs[1].set_title(f'Final $Q_{0}$', fontsize=26)
         axs[1].matshow(Q, vmin=-1, vmax=1)
         fig.colorbar(cax1, ax=axs, orientation='vertical')
         axs[0].tick_params(axis='both', which='both',
@@ -158,35 +161,24 @@ def plot_mean_attn_params(data_dirs: List[str],
         axs[1].tick_params(axis='both', which='both',
                            bottom=False, top=False,
                            left=False, right=False)
-        save_path = os.path.join(attn_dir, f'PQ_mean_{l+1}_{step}.png')
-        plt.savefig(save_path, dpi=300)
+        save_path = os.path.join(attn_dir, f'PQ_mean_{l+1}_{step}.pdf')
+        plt.savefig(save_path, dpi=300, format="pdf")
+        # save a copy in the final dir
+        final_save_path = os.path.join(final_figures_dir, f'PQ_mean_{l+1}_{step}.pdf')
+        plt.savefig(final_save_path, dpi=300, format="pdf")
         plt.close(fig)
 
     fig = plt.figure(figsize=(10, 5))
     plt.plot(xs, mean_alphas)
     plt.fill_between(xs, mean_alphas - std_alphas,
                      mean_alphas + std_alphas, alpha=0.2)
-    plt.xlabel('# MRPS')
+    plt.xlabel('# MRPs')
     plt.ylabel('Alpha')
-    plt.title('Mean Alpha vs # MRPS')
-    plt.savefig(os.path.join(attn_dir, 'alpha.png'))
+    plt.title('Mean Alpha vs # MRPs')
+    plt.savefig(os.path.join(attn_dir, 'alpha.pdf'),format='pdf')
     plt.close(fig)
 
-
-def plot_error_data(xs: np.ndarray,
-                    error_log: dict,
-                    save_dir: str,
-                    params: dict) -> None:
-    '''
-    plot the error data from validation
-    xs: x-axis values
-    error_log: dictionary containing the error data
-    save_dir: directory to save the plots
-    '''
-    error_dir = os.path.join(save_dir, 'error_metrics_plots')
-    if not os.path.exists(error_dir):
-        os.makedirs(error_dir)
-
+def get_tf_title(params: dict) -> str:
     # specify that there is no activation function for linear transformers
     if params['linear'] == True:
         params['act'] = 'None'
@@ -203,9 +195,29 @@ def plot_error_data(xs: np.ndarray,
         sample_weight = 'nonrep'
 
     transformer_title = f"TF(mode={mode}, L={params['l']}, act={params['act']}, vf={sample_weight})"
+    return transformer_title
+
+def plot_error_data(xs: np.ndarray,
+                    error_log: dict,
+                    save_dir: str,
+                    final_figures_dir: str,
+                    params: dict) -> None:
+    '''
+    plot the error data from validation
+    xs: x-axis values
+    error_log: dictionary containing the error data
+    save_dir: directory to save the plots
+    '''
+    error_dir = os.path.join(save_dir, 'error_metrics_plots')
+    if not os.path.exists(error_dir):
+        os.makedirs(error_dir)
+
+    transformer_title = get_tf_title(params)
 
     # set plotting style (ieee supports color blindness)
-    plt.style.use(['science', 'ieee', 'no-latex'])
+    plt.style.use(['science', 'vibrant', 'no-latex'])
+
+    num_seeds = error_log['mstde'].shape[0]
 
     # MSTDE
     mean_mstde = np.mean(error_log['mstde'], axis=0)
@@ -219,11 +231,11 @@ def plot_error_data(xs: np.ndarray,
     plt.plot(xs, mean_mstde_hard, label='MSTDE Hard')
     plt.fill_between(xs, mean_mstde_hard - std_mstde_hard,
                      mean_mstde_hard + std_mstde_hard, alpha=0.2)
-    plt.xlabel('# MRPS')
+    plt.xlabel('# MRPs')
     plt.ylabel('Loss (MSTDE)')
-    plt.title(f'{transformer_title}\n Training Loss (MSTDE)')
+    plt.title('Training Loss (MSTDE)')
     plt.legend()
-    plt.savefig(os.path.join(error_dir, 'loss_mstde.png'), dpi=300)
+    plt.savefig(os.path.join(error_dir, 'loss_mstde.pdf'), dpi=300, format='pdf')
     plt.close(fig)
 
     # Value error
@@ -246,11 +258,11 @@ def plot_error_data(xs: np.ndarray,
         plt.plot(xs, mean_true_msve, label='True Min')
         plt.fill_between(xs, mean_true_msve - std_true_msve,
                          mean_true_msve + std_true_msve, alpha=0.2)
-    plt.xlabel('# MRPS')
+    plt.xlabel('# MRPs')
     plt.ylabel('MSVE')
-    plt.title(f'{transformer_title}\n MSVE vs # MRPS')
+    plt.title('MSVE vs # MRPs')
     plt.legend()
-    plt.savefig(os.path.join(error_dir, 'msve.png'), dpi=300)
+    plt.savefig(os.path.join(error_dir, 'msve.pdf'), dpi=300, format='pdf')
     plt.close(fig)
 
     if params['linear']:  # MSPBE only computable for linear TF
@@ -266,86 +278,64 @@ def plot_error_data(xs: np.ndarray,
         plt.plot(xs, mean_td_mspbe, label='$TD$')
         plt.fill_between(xs, mean_td_mspbe - std_td_mspbe,
                          mean_td_mspbe + std_td_mspbe, alpha=0.2)
-        plt.xlabel('# MRPS')
+        plt.xlabel('# MRPs')
         plt.ylabel('MSPBE')
         plt.ylim(0)
         plt.title(f"{transformer_title}\n MSPBE")
         plt.legend(frameon=True, framealpha=0.8,
                    fontsize='small').set_alpha(0.5)
-        plt.savefig(os.path.join(error_dir, 'mspbe.png'), dpi=300)
+        plt.savefig(os.path.join(error_dir, 'mspbe.pdf'), dpi=300, format='pdf')
         plt.close(fig)
 
     # Value function similarity
     mean_vf_sim = np.mean(error_log['v_tf v_td msve'], axis=0)
     std_vf_sim = np.std(error_log['v_tf v_td msve'], axis=0)
+    stde_vf_sim = std_vf_sim / np.sqrt(num_seeds)
     mean_zo_cos_sim = np.mean(error_log['zero order cos sim'], axis=0)
     std_zo_cos_sim = np.std(error_log['zero order cos sim'], axis=0)
+    stde_zo_cos_sim = std_zo_cos_sim / np.sqrt(num_seeds)
     mean_sensitivity_cos_sim = np.mean(error_log['sensitivity cos sim'], axis=0)
     std_sensitivity_cos_sim = np.std(error_log['sensitivity cos sim'], axis=0)
+    stde_sensitivity_cos_sim = std_sensitivity_cos_sim / np.sqrt(num_seeds)
 
-    fig = plt.figure()
-    _, ax1 = plt.subplots()
-    plt.title(f"{transformer_title} \n and Batch TD Value Function Comparison")
-    ax1.set_xlabel('# MRPS')
+    #plt.figure()
+    fig, ax1 = plt.subplots()
+    plt.title("Learned TF and Batch TD Comparison")
+    ax1.set_xlabel('# MRPs')
     ax1.set_ylabel('Cosine Similarity')
-    ax1.set_ylim(-0.3, 1.2)
-    c, = ax1.plot(xs, mean_zo_cos_sim, label='0 Order cos sim',
+    ax1.set_ylim(0, 1.1)
+    plt.minorticks_off()
+    b, = ax1.plot(xs, mean_zo_cos_sim, label='IWS',
                   color=sns.color_palette()[0])
-    ax1.fill_between(xs, mean_zo_cos_sim - std_zo_cos_sim,
-                     mean_zo_cos_sim + std_zo_cos_sim, lw=0, alpha=0.2, color=sns.color_palette()[0])
+    ax1.fill_between(xs, mean_zo_cos_sim - stde_zo_cos_sim,
+                     mean_zo_cos_sim + stde_zo_cos_sim, lw=0, alpha=0.2, color=sns.color_palette()[0])
     a, = ax1.plot(xs, mean_sensitivity_cos_sim,
-                  label='model cos sim', color=sns.color_palette()[2])
-    ax1.fill_between(xs, mean_sensitivity_cos_sim - std_sensitivity_cos_sim,
-                     mean_sensitivity_cos_sim + std_sensitivity_cos_sim, lw=0, alpha=0.2, color=sns.color_palette()[2])
+                  label='SS', color=sns.color_palette()[5], linestyle='dashed')
+    ax1.fill_between(xs, mean_sensitivity_cos_sim - stde_sensitivity_cos_sim,
+                     mean_sensitivity_cos_sim + stde_sensitivity_cos_sim, lw=0, alpha=0.3, color=sns.color_palette()[5])
     ax2 = ax1.twinx()
-    ax2.set_ylabel('TF and Batch TD MSVE')
-    b, = ax2.plot(xs, mean_vf_sim, label='MSVE', color=sns.color_palette()[1])
-    ax2.fill_between(xs, mean_vf_sim - std_vf_sim,
-                     mean_vf_sim + std_vf_sim, lw=0, alpha=0.2, color=sns.color_palette()[1], linestyle='dashdot')
-    ax2.tick_params(axis='y')
-    ax2.set_ylim(0, 2.5)
+    plt.minorticks_off()
+    ax2.set_ylabel('Value Difference')
+    if params['sample_weight']:
+        ax2.set_ylim(0, 3.0)
+    else:
+        ax2.set_ylim(0, 0.3)
+    c, = ax2.plot(xs, mean_vf_sim, label='VD', color=sns.color_palette()[1])
+    ax2.fill_between(xs, mean_vf_sim - stde_vf_sim,
+                     mean_vf_sim + stde_vf_sim, lw=0, alpha=0.3, color=sns.color_palette()[1])
+    #ax2.set_ylim(0, 2.5)
     #ax1.set_zorder(ax2.get_zorder() + 1) # bring axis 1 to the front
     p = [a, b, c]
-    ax2.legend(p, [p_.get_label() for p_ in p], frameon=True, framealpha=0.8,
-               fontsize='small', loc='center right')
-    fig.tight_layout()
-    plt.savefig(os.path.join(error_dir, 'cos_similarity.png'), dpi=300)
-    plt.close(fig)
-
-    # Smoothed version of the above plot
-    mean_vf_sim_smooth = smooth_data(mean_vf_sim, 5)
-    mean_zo_cos_sim_smooth = smooth_data(mean_zo_cos_sim, 5)
-    mean_sensitivity_cos_sim_smooth = smooth_data(mean_sensitivity_cos_sim, 5)
-
-    fig = plt.figure()
-    _, ax1 = plt.subplots()
-    plt.title(
-        f"TF(mode={params['mode']} L={params['l']}, v rep={params['sample_weight']}) and Batch TD \n Predicted Value Function Comparison")
-    ax1.set_xlabel('# MRPS')
-    ax1.set_ylabel('Cosine Similarity')
-    ax1.set_ylim(-0.3, 1.2)
-    c, = ax1.plot(xs, mean_zo_cos_sim_smooth, label='0th Order',
-                  color=sns.color_palette()[0])
-    ax1.fill_between(xs, mean_zo_cos_sim_smooth - std_zo_cos_sim,
-                     mean_zo_cos_sim_smooth + std_zo_cos_sim, lw=0, alpha=0.2, color=sns.color_palette()[0])
-    a, = ax1.plot(xs, mean_sensitivity_cos_sim_smooth, label='Sensitivity', color=sns.color_palette()[2])
-    ax1.fill_between(xs, mean_sensitivity_cos_sim_smooth - std_sensitivity_cos_sim,
-                     mean_sensitivity_cos_sim_smooth + std_sensitivity_cos_sim, lw=0, alpha=0.2, color=sns.color_palette()[2])
-
-    ax2 = ax1.twinx()
-    ax2.set_ylabel('MSVE')
-    ax2.set_ylim(0, 0.5)
-    b, = ax2.plot(xs, mean_vf_sim_smooth, label='MSVE', color=sns.color_palette()[1], linestyle='dashdot')
-    ax2.fill_between(xs, mean_vf_sim_smooth - std_vf_sim,
-                     mean_vf_sim_smooth + std_vf_sim, lw=0, alpha=0.2, color=sns.color_palette()[1])
-
-    ax2.tick_params(axis='y')
-    p = [a, b, c]
-    ax2.legend(p, [p_.get_label() for p_ in p], frameon=True, framealpha=0.8,
-                            fontsize='small')
-    fig.tight_layout()
-    plt.savefig(os.path.join(error_dir, 'cos_similarity_smooth.png'), dpi=300)
-    plt.close(fig)
+    if params['linear']:
+        ax2.legend(p, [p_.get_label() for p_ in p], frameon=True, framealpha=0.8, loc='center right').set_alpha(0.5)
+    else:
+        ax2.legend(p, [p_.get_label() for p_ in p], frameon=True, framealpha=0.8, loc='upper left').set_alpha(0.5)
+    #fig.tight_layout()
+    #fig.set_size_inches(5, 8)
+    plt.savefig(os.path.join(error_dir, 'cos_similarity.pdf'), dpi=300, format='pdf')
+    # save a copy in the final figures directory
+    plt.savefig(os.path.join(final_figures_dir, 'cos_similarity.pdf'), dpi=300, format='pdf')
+    plt.close()
 
 
 def plot_attention_params(xs: np.ndarray,
@@ -384,8 +374,8 @@ def plot_attention_params(xs: np.ndarray,
                            bottom=False, top=False, left=False, right=False)
         axs[1].tick_params(axis='both', which='both',
                            bottom=False, top=False, left=False, right=False)
-        save_path = os.path.join(attn_dir, f'PQ_{l+1}_{step}.png')
-        plt.savefig(save_path, dpi=300)
+        save_path = os.path.join(attn_dir, f'PQ_{l+1}_{step}.pdf')
+        plt.savefig(save_path, dpi=300, format = 'pdf')
         plt.close(fig)
         paths.append(save_path)
 
@@ -393,10 +383,10 @@ def plot_attention_params(xs: np.ndarray,
         alphas = params['alpha']
         fig = plt.figure(figsize=(10, 5))
         plt.plot(xs, alphas)
-        plt.xlabel('# MRPS')
+        plt.xlabel('# MRPs')
         plt.ylabel('Alpha')
-        plt.title('Alpha vs # MRPS')
-        plt.savefig(os.path.join(attn_dir, 'alpha.png'))
+        plt.title('Alpha vs # MRPs')
+        plt.savefig(os.path.join(attn_dir, 'alpha.pdf'))
         plt.close(fig)
 
     return paths
@@ -437,6 +427,7 @@ def plot_weight_metrics(xs: np.ndarray,
                         P_metrics: dict,
                         Q_metrics: dict,
                         save_dir: str,
+                        final_figures_dir: str,
                         params: dict) -> None:
     '''
     plot the metrics for P and Q
@@ -453,41 +444,42 @@ def plot_weight_metrics(xs: np.ndarray,
     if not os.path.exists(Q_metrics_dir):
         os.makedirs(Q_metrics_dir)
 
-    plt.style.use(['science', 'ieee', 'no-latex'])
+    transformer_title = get_tf_title(params)
+
+    plt.style.use(['science', 'bright', 'no-latex'])
     # same layer, different metrics
     for i in range(l):
         fig = plt.figure()
         for key, metric in P_metrics.items():
-            # if sequential, add layer number to the label and title
-            if params['mode'] == 'sequential':
-                plt.title(
-                    f'TF (mode={params["mode"]}, L={params["l"]}) $P_{i}$ Metrics')
-                if key == 'norm_diff':
-                    label = (r'$||P^{TF}_{%s} - P^{TD}||_2$' % (str(i)))
-                elif key == 'bottom_right':
-                    label = (r'$P^{TF}_{%s}[-1, -1]$' % (str(i)))
-                elif key == 'avg_abs_all_others':
-                    label = 'Avg Abs Others'
+            # for the standard setting in the main paper, don't plot the transformer title
+            if params['mode'] == 'auto' and params['l'] == 3 and params['linear'] == True: 
+                plt.title(f'$P_{i}$ Metrics', fontsize=20)
             else:
                 plt.title(
-                    f'TF (mode={params["mode"]}, L={params["l"]}) $P$ Metrics')
-                if key == 'norm_diff':
-                    label = (r'$||P^{TF} - P^{TD}||_2$')
-                elif key == 'bottom_right':
-                    label = (r'$P^{TF}[-1, -1]$')
-                elif key == 'avg_abs_all_others':
-                    label = 'Avg Abs Others'
+                    f'$P_{i}$ Metrics')
+            if key == 'norm_diff':
+                label = (r'$||P_{%s} - P^{TD}_{%s}||_2$' % (str(i), str(i)))
+            elif key == 'bottom_right':
+                label = (r'$P_{%s}[-1, -1]$' % (str(i)))
+            elif key == 'avg_abs_all_others':
+                label = 'Avg Abs Others'
             mean_metric = np.mean(metric, axis=0)  # shape (T, l)
             std_metric = np.std(metric, axis=0)
-            assert mean_metric.shape == std_metric.shape
-            plt.plot(xs, mean_metric[:, i], label=label)
-            plt.fill_between(xs, mean_metric[:, i] - std_metric[:, i],
-                             mean_metric[:, i] + std_metric[:, i], alpha=0.2)
-            plt.xlabel('# MRPS')
-            plt.legend(frameon=True, framealpha=0.8,
-                       fontsize='small').set_alpha(0.5)
+            stde_metric = std_metric / np.sqrt(metric.shape[0])
+            assert mean_metric.shape == stde_metric.shape
+            if key != 'norm_diff':
+                plt.plot(xs, mean_metric[:, i], label=label)
+                plt.fill_between(xs, mean_metric[:, i] - stde_metric[:, i],
+                                mean_metric[:, i] + stde_metric[:, i], alpha=0.3)
+        plt.xlabel('# MRPs')
+        plt.ylim(0,2)
+        plt.minorticks_off()
+        plt.legend(frameon=True, framealpha=0.8,
+                    fontsize='medium').set_alpha(0.5) 
         plt.savefig(os.path.join(P_metrics_dir,
-                    f'P_metrics_{i+1}.png'), dpi=300)
+                    f'P_metrics_{i+1}.pdf'), dpi=300, format='pdf')
+        # save a copy in the final figures directory
+        plt.savefig(os.path.join(final_figures_dir, f'P_metrics_{i+1}.pdf'), dpi=300, format='pdf')
         plt.close(fig)
 
     # same metric, different layers
@@ -500,50 +492,41 @@ def plot_weight_metrics(xs: np.ndarray,
             plt.plot(xs, mean_metric[:, i], label=f'layer={i+1}')
             plt.fill_between(xs, mean_metric[:, i] - std_metric[:, i],
                              mean_metric[:, i] + std_metric[:, i], alpha=0.2)
-            plt.xlabel('# MRPS')
+            plt.xlabel('# MRPs')
             plt.title(f'Transformer P Matrix {key.replace("_", " ").title()}')
             plt.legend()
-        plt.savefig(os.path.join(P_metrics_dir, f'P_{key}.png'), dpi=300)
+        plt.savefig(os.path.join(P_metrics_dir, f'P_{key}.pdf'), dpi=300, format='pdf')
         plt.close(fig)
 
     # same layer, different metrics
     for i in range(l):
         fig = plt.figure()
         for key, metric in Q_metrics.items():
-            # if sequential, add layer number to the label and title
-            if params['mode'] == 'sequential':
-                plt.title(
-                    f'TF (mode={params["mode"]}, L={params["l"]}) $Q_{i}$ Metrics')
-                if key == 'norm_diff':
-                    label = (r'$||Q^{TF}_{%s} - Q^{TD}||_2$' % (str(i)))
-                elif key == 'upper_left_trace':
-                    label = (r'tr$(Q^{TF}_{%s}[:d, :d])$' % str(i))
-                elif key == 'upper_right_trace':
-                    label = (r'tr$(Q^{TF}_{%s}[:d, d:2d])$' % str(i))
-                elif key == 'avg_abs_all_others':
-                    label = 'Avg Abs Others'
-            else:
-                plt.title(
-                    f'TF (mode={params["mode"]}, L={params["l"]}) $Q$ Metrics')
-                if key == 'norm_diff':
-                    label = (r'$||Q^{TF} - Q^{TD}||_2$')
-                elif key == 'upper_left_trace':
-                    label = (r'tr$(Q^{TF}[:d, :d])$')
-                elif key == 'upper_right_trace':
-                    label = (r'tr$(Q^{TF}[:d, d:2d])$')
-                elif key == 'avg_abs_all_others':
-                    label = 'Avg Abs Others'
+            # for the standard setting in the main paper, don't plot the transformer title
+            plt.title(f'$Q_{i}$ Metrics', fontsize=20)
+            if key == 'norm_diff':
+                label = (r'$||Q_{%s} - Q^{TD}_{%s}||_2$' % (str(i), str(i)))
+            elif key == 'upper_left_trace':
+                label = (r'tr$(Q_{%s}[:d, :d])$' % str(i))
+            elif key == 'upper_right_trace':
+                label = (r'tr$(Q_{%s}[:d, d:2d])$' % str(i))
+            elif key == 'avg_abs_all_others':
+                label = 'Avg Abs Others'
             mean_metric = np.mean(metric, axis=0)
             std_metric = np.std(metric, axis=0)
-            assert mean_metric.shape == std_metric.shape
-            plt.plot(xs, mean_metric[:, i], label=label)
-            plt.fill_between(xs, mean_metric[:, i] - std_metric[:, i],
-                             mean_metric[:, i] + std_metric[:, i], alpha=0.2)
-            plt.xlabel('# MRPS')
-            plt.legend(frameon=True, framealpha=0.8,
-                       fontsize='small').set_alpha(0.5)
+            stde_metric = std_metric / np.sqrt(metric.shape[0])
+            assert mean_metric.shape == stde_metric.shape
+            if key != 'norm_diff':
+                plt.plot(xs, mean_metric[:, i], label=label)
+                plt.fill_between(xs, mean_metric[:, i] - stde_metric[:, i],
+                                mean_metric[:, i] + stde_metric[:, i], alpha=0.3)
+        plt.xlabel('# MRPs')
+        plt.minorticks_off()
+        plt.legend(frameon=True, framealpha=0.8).set_alpha(0.5)
         plt.savefig(os.path.join(Q_metrics_dir,
-                    f'Q_metrics_{i+1}.png'), dpi=300)
+                    f'Q_metrics_{i+1}.pdf'), dpi=300, format='pdf')
+        plt.savefig(os.path.join(final_figures_dir,
+            f'Q_metrics_{i+1}.pdf'), dpi=300, format='pdf')
         plt.close(fig)
 
     # same metric, different layers
@@ -555,11 +538,11 @@ def plot_weight_metrics(xs: np.ndarray,
         for i in range(l):
             plt.plot(xs, mean_metric[:, i], label=f'layer={i+1}')
             plt.fill_between(xs, mean_metric[:, i] - std_metric[:, i],
-                             mean_metric[:, i] + std_metric[:, i], alpha=0.2)
-            plt.xlabel('# MRPS')
+                             mean_metric[:, i] + std_metric[:, i], alpha=0.3)
+            plt.xlabel('# MRPs')
             plt.title(f'Transformer Q Matrix {key.replace("_", " ").title()}')
             plt.legend()
-        plt.savefig(os.path.join(Q_metrics_dir, f'Q_{key}.png'), dpi=300)
+        plt.savefig(os.path.join(Q_metrics_dir, f'Q_{key}.pdf'), dpi=300,format="pdf")
         plt.close(fig)
 
 
@@ -636,7 +619,7 @@ def compute_weight_metrics(attn_params: dict,
 
 if __name__ == '__main__':
     runs_directory = os.path.join(
-        './logs', 'nonlinear_discounted_train', '2024-05-10-01-06-40_representable')
+        './logs', 'nonlinear_discounted_train', '2024-05-10-01-06-39_standard')
     runs_to_plot = [run for run in os.listdir(
         runs_directory) if run.startswith('seed')]
     plot_multiple_runs([os.path.join(runs_directory, run)
