@@ -13,7 +13,10 @@ class Feature:
         '''
         self.d = d
         self.s = s
-        self.phi = np.random.uniform(low=-1, high=1, size=(s, d)).astype(np.float32)
+        if s <= d:
+            self.phi = np.eye(s, dtype=np.float32)
+        else:
+            self.phi = np.random.uniform(low=-1, high=1, size=(s, d)).astype(np.float32)
 
     def __call__(self, s: int):
         return self.phi[s]

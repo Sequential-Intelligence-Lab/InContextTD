@@ -1,4 +1,5 @@
 import os
+from argparse import ArgumentParser, Namespace
 
 from experiment.plotter import (compute_weight_metrics,
                                 generate_attention_params_gif, get_hardcoded_P,
