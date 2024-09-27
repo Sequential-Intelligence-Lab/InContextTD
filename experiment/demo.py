@@ -7,6 +7,8 @@ import numpy as np
 import torch
 import torch.optim as optim
 from tqdm import tqdm
+import seaborn as sns
+import scienceplots
 
 from experiment.model import HardLinearTransformer, LinearTransformer
 from experiment.plotter import (load_data, plot_attention_params,
@@ -24,17 +26,17 @@ if __name__ == '__main__':
     from utils import get_hardcoded_P, get_hardcoded_Q
     d = 5
     #n = 30
-    l = 20
-    s = 5
+    l = 6
+    s = 10
     gamma = 0.9
     sample_weight = True
     mode = 'auto'
     startTime = datetime.datetime.now()
     save_dir = os.path.join('../logs')
     data_dirs = []
-    n_mdps = 50
+    n_mdps = 1000
     alpha = 0.5
-    context_lengths = list(range(1, 101, 10))
+    context_lengths = list(range(1, 42, 2))
     msve_dict = {n: [] for n in context_lengths}
     for n in context_lengths:
         pro_gen = MDPPromptGenerator(s, d, n, gamma)
@@ -59,8 +61,9 @@ if __name__ == '__main__':
     avg_msve = {n: np.mean(msve_dict[n]) for n in context_lengths}
 
     # Plot the average MSVE as a function of context length
-    plt.figure(figsize=(10, 6))
-    plt.plot(context_lengths, list(avg_msve.values()), marker='o')
+    plt.style.use(['science', 'bright', 'no-latex'])
+    plt.figure()
+    plt.plot(context_lengths, list(avg_msve.values()))
     # Calculate the standard error of the mean for each context length
     std_err = {n: np.std(msve_dict[n]) / np.sqrt(len(msve_dict[n])) if len(msve_dict[n]) > 0 else 0 for n in context_lengths}
 
@@ -69,12 +72,12 @@ if __name__ == '__main__':
     std_err_values = list(std_err.values())
     #import pdb; pdb.set_trace()
     plt.fill_between(context_lengths, 
-                     [avg - err for avg, err in zip(avg_msve_values, std_err_values)], 
+                     [max(0, avg - err) for avg, err in zip(avg_msve_values, std_err_values)], 
                      [avg + err for avg, err in zip(avg_msve_values, std_err_values)], 
                      color='b', alpha=0.2)
     plt.xlabel('Context Length')
     plt.ylabel('Average MSVE')
     plt.title('Average MSVE vs Context Length')
     plt.grid(True)
-    plt.savefig('avg_msve_vs_context_length.png')
+    plt.savefig('avg_msve_vs_context_length.pdf', dpi=300, format='pdf')
     plt.show()
