@@ -1,7 +1,10 @@
-import torch
-from MRP.boyan import BoyanChain
-import numpy as np
 from collections import deque
+
+import numpy as np
+import torch
+
+from MRP.boyan import BoyanChain
+from MRP.loop import Loop
 
 
 class Feature:
@@ -16,7 +19,8 @@ class Feature:
         if s <= d:
             self.phi = np.eye(s, dtype=np.float32)
         else:
-            self.phi = np.random.uniform(low=-1, high=1, size=(s, d)).astype(np.float32)
+            self.phi = np.random.uniform(
+                low=-1, high=1, size=(s, d)).astype(np.float32)
 
     def __call__(self, s: int):
         return self.phi[s]
@@ -207,7 +211,8 @@ class MDPPromptGenerator:
                  s: int,
                  d: int,
                  n: int,
-                 gamma: float):
+                 gamma: float,
+                 mdp_class: str = 'boyan'):
         '''
         s: number of states
         d: feature dimension
@@ -219,14 +224,18 @@ class MDPPromptGenerator:
         self.d = d
         self.n = n
         self.gamma = gamma
+        self.mdp_class = mdp_class
 
-    def reset_mdp(self, sample_weight: bool = False):
-        if sample_weight:
-            w = np.random.randn(self.d, 1)
+    def reset_mdp(self, sample_weight: bool = False, threshold: float = 0.5):
+        w = np.random.randn(self.d, 1) if sample_weight else None
+        if self.mdp_class == 'boyan':
             self.mdp = BoyanChain(n_states=self.s, gamma=self.gamma,
                                   weight=w, X=self.feat.phi)
+        elif self.mdp_class == 'loop':
+            self.mdp = Loop(n_states=self.s, gamma=self.gamma, threshold=threshold,
+                            weight=w, Phi=self.feat.phi)
         else:
-            self.mdp = BoyanChain(n_states=self.s, gamma=self.gamma)
+            raise ValueError("Unknown MDP type")
 
     def reset_feat(self):
         self.feat = Feature(self.d, self.s)
@@ -263,4 +272,3 @@ if __name__ == '__main__':
 
     pro = mdp_prompt.copy()
     print(pro.mdp.w)
-    

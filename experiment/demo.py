@@ -34,12 +34,12 @@ if __name__ == '__main__':
     startTime = datetime.datetime.now()
     save_dir = os.path.join('../logs')
     data_dirs = []
-    n_mdps = 1000
+    n_mdps = 10
     alpha = 0.5
     context_lengths = list(range(1, 42, 2))
     msve_dict = {n: [] for n in context_lengths}
     for n in context_lengths:
-        pro_gen = MDPPromptGenerator(s, d, n, gamma)
+        pro_gen = MDPPromptGenerator(s, d, n, gamma, 'loop')
         msves= []
         for i in range(n_mdps):
             pro_gen.reset_feat()  # reset feature
