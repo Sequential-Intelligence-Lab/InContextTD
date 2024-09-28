@@ -21,7 +21,7 @@ if __name__ == '__main__':
     min_s = 5
     max_s = 15
     gamma = 0.9
-    n_mrps = 100
+    n_mrps = 300
     alpha = 0.2
     context_lengths = list(range(1, 41, 2))
 
@@ -56,7 +56,7 @@ if __name__ == '__main__':
                      mean + ste,
                      color='b', alpha=0.2)
     plt.xlabel('Context Length (t)')
-    plt.ylabel('Avg MSVE', rotation=0, labelpad=30)
+    plt.ylabel('MSVE', rotation=0, labelpad=30)
     plt.grid(True)
     fig_path = os.path.join('logs', 'demo', 'msve_vs_context_length.pdf')
     plt.savefig(fig_path, dpi=300, format='pdf')
