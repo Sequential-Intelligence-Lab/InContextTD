@@ -48,7 +48,7 @@ if __name__ == '__main__':
     ste = np.std(all_msves, axis=0) / np.sqrt(n_mrps)
 
     plt.style.use(['science', 'bright', 'no-latex'])
-    plt.figure()
+    fig = plt.figure()
     plt.plot(context_lengths, mean)
 
     plt.fill_between(context_lengths,
@@ -61,3 +61,4 @@ if __name__ == '__main__':
     fig_path = os.path.join('logs', 'demo', 'msve_vs_context_length.pdf')
     plt.savefig(fig_path, dpi=300, format='pdf')
     plt.show()
+    plt.close(fig)
