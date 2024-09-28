@@ -55,8 +55,8 @@ if __name__ == '__main__':
                      np.clip(mean - ste, a_min=0, a_max=None),
                      mean + ste,
                      color='b', alpha=0.2)
-    plt.xlabel('Context Length')
-    plt.ylabel('Average MSVE', rotation=0, labelpad=30)
+    plt.xlabel('Context Length (t)')
+    plt.ylabel('Avg MSVE', rotation=0, labelpad=30)
     plt.grid(True)
     fig_path = os.path.join('logs', 'demo', 'msve_vs_context_length.pdf')
     plt.savefig(fig_path, dpi=300, format='pdf')
