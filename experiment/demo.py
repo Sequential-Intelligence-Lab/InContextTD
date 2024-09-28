@@ -24,7 +24,9 @@ if __name__ == '__main__':
     from plotter import (compute_weight_metrics, plot_error_data,
                          plot_weight_metrics, process_log)
     from utils import get_hardcoded_P, get_hardcoded_Q
-    d = 5
+    random_seed = 42
+    set_seed(random_seed)
+    d = 4
     #n = 30
     l = 6
     s = 10
@@ -36,7 +38,7 @@ if __name__ == '__main__':
     data_dirs = []
     n_mdps = 1000
     alpha = 0.5
-    context_lengths = list(range(1, 42, 2))
+    context_lengths = list(range(1, 32))
     msve_dict = {n: [] for n in context_lengths}
     for n in context_lengths:
         pro_gen = MDPPromptGenerator(s, d, n, gamma)
@@ -75,9 +77,7 @@ if __name__ == '__main__':
                      [max(0, avg - err) for avg, err in zip(avg_msve_values, std_err_values)], 
                      [avg + err for avg, err in zip(avg_msve_values, std_err_values)], 
                      color='b', alpha=0.2)
-    plt.xlabel('Context Length')
-    plt.ylabel('Average MSVE')
-    plt.title('Average MSVE vs Context Length')
-    plt.grid(True)
+    plt.xlabel('Context Length (t)')
+    plt.ylabel('Avg MSVE', rotation=0, labelpad=30)
     plt.savefig('avg_msve_vs_context_length.pdf', dpi=300, format='pdf')
     plt.show()
