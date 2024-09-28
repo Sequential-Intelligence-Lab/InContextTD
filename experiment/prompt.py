@@ -8,7 +8,7 @@ from MRP.loop import Loop
 
 
 class Feature:
-    def __init__(self, d: int, s: int):
+    def __init__(self, d: int, s: int, mode: str = 'random'):
         '''
         d: dimension of the feature vector
         s: number of states
@@ -16,11 +16,14 @@ class Feature:
         '''
         self.d = d
         self.s = s
-        if s <= d:
+        if mode == 'random':
+            self.phi = np.random.uniform(low=-1, high=1, size=(s, d)).astype(np.float32)
+        elif mode == 'one-hot':
+            assert s == d, "number of states must be equal to the feature dimension"
             self.phi = np.eye(s, dtype=np.float32)
         else:
-            self.phi = np.random.uniform(
-                low=-1, high=1, size=(s, d)).astype(np.float32)
+            raise ValueError("Unknown mode")
+            
 
     def __call__(self, s: int):
         return self.phi[s]

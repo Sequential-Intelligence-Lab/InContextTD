@@ -1,83 +1,63 @@
 import datetime
-import json
 import os
+
 import matplotlib.pyplot as plt
-
 import numpy as np
-import torch
-import torch.optim as optim
-from tqdm import tqdm
-import seaborn as sns
 import scienceplots
+import torch
+from tqdm import tqdm
 
-from experiment.model import HardLinearTransformer, LinearTransformer
-from experiment.plotter import (load_data, plot_attention_params,
-                                plot_mean_attn_params, plot_multiple_runs)
-from experiment.prompt import MDPPromptGenerator
-from experiment.utils import (compare_sensitivity, compute_mspbe, compute_msve,
-                              first_order_comparison, set_seed,
-                              solve_msve_weight, zero_order_comparison)
-from MRP.mrp import MRP
-
+from experiment.prompt import Feature, MDPPrompt, MDPPromptGenerator
+from experiment.utils import compute_msve, set_seed
+from MRP.loop import Loop
 
 if __name__ == '__main__':
-    from plotter import (compute_weight_metrics, plot_error_data,
-                         plot_weight_metrics, process_log)
-    from utils import get_hardcoded_P, get_hardcoded_Q
+    os.makedirs(os.path.join('logs', 'demo'), exist_ok=True)
+
+    set_seed(42)
+
     d = 5
-    #n = 30
-    l = 6
-    s = 10
+    l = 15
+    min_s = 5
+    max_s = 15
     gamma = 0.9
-    sample_weight = True
-    mode = 'auto'
-    startTime = datetime.datetime.now()
-    save_dir = os.path.join('../logs')
-    data_dirs = []
-    n_mdps = 10
-    alpha = 0.5
-    context_lengths = list(range(1, 42, 2))
-    msve_dict = {n: [] for n in context_lengths}
-    for n in context_lengths:
-        pro_gen = MDPPromptGenerator(s, d, n, gamma, 'loop')
-        msves= []
-        for i in range(n_mdps):
-            pro_gen.reset_feat()  # reset feature
-            pro_gen.reset_mdp(sample_weight=True)  # reset MDP
-            prompt = pro_gen.get_prompt()  # get prompt object
+    n_mrps = 100
+    alpha = 0.2
+    context_lengths = list(range(1, 41, 2))
+
+    all_msves = []  # (n_mrps, len(context_lengths))
+    for _ in tqdm(range(n_mrps)):
+        s = np.random.randint(min_s, max_s + 1)  # sample number of states
+        feature = Feature(d, s)  # new feature
+        true_w = np.random.randn(d, 1)  # sample true weight
+        mrp = Loop(s, gamma, threshold=0.5, weight=true_w, Phi=feature.phi)
+        msve_n = []
+        for n in context_lengths:
+            prompt = MDPPrompt(d, n, gamma, mrp, feature)
             prompt.reset()
-            mdp: MRP = prompt.mdp
-            phi: np.ndarray = prompt.get_feature_mat().numpy()
-            #print(phi.shape)
-            steady_d: np.ndarray = mdp.steady_d
-            true_v: np.ndarray = mdp.v
             w = torch.zeros((d, 1))
             for _ in range(l):
-                w, _= prompt.td_update(w, lr = alpha)
-            msves.append(compute_msve(phi@w.numpy(), true_v, steady_d))
-        msve_dict[n].append(msves)
+                w, _ = prompt.td_update(w, lr=alpha)
+            msve_n.append(compute_msve(feature.phi @ w.numpy(), 
+                                       mrp.v, 
+                                       mrp.steady_d))
+        all_msves.append(msve_n)
 
-    # Calculate the average MSVE for each context length
-    avg_msve = {n: np.mean(msve_dict[n]) for n in context_lengths}
+    all_msves = np.array(all_msves)
+    mean = np.mean(all_msves, axis=0)
+    ste = np.std(all_msves, axis=0) / np.sqrt(n_mrps)
 
-    # Plot the average MSVE as a function of context length
     plt.style.use(['science', 'bright', 'no-latex'])
     plt.figure()
-    plt.plot(context_lengths, list(avg_msve.values()))
-    # Calculate the standard error of the mean for each context length
-    std_err = {n: np.std(msve_dict[n]) / np.sqrt(len(msve_dict[n])) if len(msve_dict[n]) > 0 else 0 for n in context_lengths}
+    plt.plot(context_lengths, mean)
 
-    # Plot the average MSVE with standard error as a shaded region
-    avg_msve_values = list(avg_msve.values())
-    std_err_values = list(std_err.values())
-    #import pdb; pdb.set_trace()
-    plt.fill_between(context_lengths, 
-                     [max(0, avg - err) for avg, err in zip(avg_msve_values, std_err_values)], 
-                     [avg + err for avg, err in zip(avg_msve_values, std_err_values)], 
+    plt.fill_between(context_lengths,
+                     np.clip(mean - ste, a_min=0, a_max=None),
+                     mean + ste,
                      color='b', alpha=0.2)
     plt.xlabel('Context Length')
-    plt.ylabel('Average MSVE')
-    plt.title('Average MSVE vs Context Length')
+    plt.ylabel('Average MSVE', rotation=0, labelpad=30)
     plt.grid(True)
-    plt.savefig('avg_msve_vs_context_length.pdf', dpi=300, format='pdf')
+    fig_path = os.path.join('logs', 'demo', 'msve_vs_context_length.pdf')
+    plt.savefig(fig_path, dpi=300, format='pdf')
     plt.show()
