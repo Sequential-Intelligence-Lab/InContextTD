@@ -28,9 +28,10 @@ if __name__ == '__main__':
     all_msves = []  # (n_mrps, len(context_lengths))
     for _ in tqdm(range(n_mrps)):
         s = np.random.randint(min_s, max_s + 1)  # sample number of states
+        thd = np.random.uniform(low=0.1, high=0.9)
         feature = Feature(d, s)  # new feature
         true_w = np.random.randn(d, 1)  # sample true weight
-        mrp = Loop(s, gamma, threshold=0.5, weight=true_w, Phi=feature.phi)
+        mrp = Loop(s, gamma, threshold=thd, weight=true_w, Phi=feature.phi)
         msve_n = []
         for n in context_lengths:
             prompt = MDPPrompt(d, n, gamma, mrp, feature)
