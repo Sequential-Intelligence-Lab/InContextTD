@@ -125,7 +125,7 @@ if __name__ == '__main__':
         log, hyperparams = load_data(data_dir)
         xs, error_log, attn_params = process_log(log)
         l_tf = args.num_layers if args.mode == 'sequential' else 1
-        plot_error_data(xs, error_log, save_dir=data_dir, params=hyperparams)
+        plot_error_data(xs, error_log, save_dir=data_dir,final_figures_dir= data_dir,params=hyperparams)
         plot_attention_params(xs, attn_params, save_dir=data_dir)
         # if args.gen_gif:
         #     generate_attention_params_gif(xs, l_tf, attn_params, data_dir)
