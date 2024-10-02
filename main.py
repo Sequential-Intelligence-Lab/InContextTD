@@ -2,14 +2,11 @@ import datetime
 import os
 from argparse import ArgumentParser, Namespace
 
-from experiment.linear_discounted_train import train as linear_train
-from experiment.nonlinear_discounted_train import train as nonlinear_train
-from experiment.plotter import (compute_weight_metrics,
-                                generate_attention_params_gif, load_data,
+from experiment.train import train
+from experiment.plotter import ( load_data,
                                 plot_attention_params, plot_error_data,
-                                plot_mean_attn_params, plot_multiple_runs,
-                                plot_weight_metrics, process_log)
-from experiment.utils import get_hardcoded_P, get_hardcoded_Q
+                                plot_mean_attn_params,
+                                process_log)
 
 if __name__ == '__main__':
     parser = ArgumentParser()
@@ -117,24 +114,15 @@ if __name__ == '__main__':
             random_seed=seed
         )
         if args.linear:
-            linear_train(**train_args)
+            train_args['activation'] = 'identity'
         else:
-            train_args['activation'] = args.activation
-            nonlinear_train(**train_args)
+            train_args['activation'] = 'softmax'
+            
+        train(**train_args)
 
         log, hyperparams = load_data(data_dir)
         xs, error_log, attn_params = process_log(log)
         l_tf = args.num_layers if args.mode == 'sequential' else 1
         plot_error_data(xs, error_log, save_dir=data_dir, params=hyperparams)
         plot_attention_params(xs, attn_params, save_dir=data_dir)
-        # if args.gen_gif:
-        #     generate_attention_params_gif(xs, l_tf, attn_params, data_dir)
-        # if args.linear:
-        #     P_true = get_hardcoded_P(args.dim_feature)
-        #     Q_true = get_hardcoded_Q(args.dim_feature)
-        #     P_metrics, Q_metrics = compute_weight_metrics(attn_params, P_true,
-        #                                                   Q_true, args.dim_feature)
-        #     plot_weight_metrics(xs, l_tf, P_metrics, Q_metrics,
-        #                         data_dir, hyperparams)
-    # plot_multiple_runs(data_dirs, save_dir=save_dir)
     plot_mean_attn_params(data_dirs, save_dir=save_dir)

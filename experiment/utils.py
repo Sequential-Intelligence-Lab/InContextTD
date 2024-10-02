@@ -82,51 +82,6 @@ def compute_msve(v_hat: np.ndarray,
     return msve.item()
 
 
-def solve_mspbe_weight(steady_dist: np.ndarray,
-                       P: np.ndarray,
-                       X: np.ndarray,
-                       r: np.ndarray,
-                       gamma: float) -> np.ndarray:
-    '''
-    steady_dist: steady state distribution
-    P: transition probability matrix
-    X: feature matrix
-    r: reward vector
-    gamma: discount factor
-    returns weight minimizing MSPBE
-    '''
-    n = P.shape[0]
-    D = np.diag(steady_dist)
-
-    A = X.T @ D @ (gamma*P - np.eye(n)) @ X
-    b = - X.T @ D @ r
-    w = np.linalg.inv(A) @ b
-
-    return w
-
-
-def compute_mspbe(v_hat: np.ndarray,
-                  steady_dist: np.ndarray,
-                  P: np.ndarray,
-                  X: np.ndarray,
-                  r: np.ndarray,
-                  gamma: float):
-    '''
-    v_hat: predicted value
-    steady_dist: steady state distribution
-    P: transition probability matrix
-    X: feature matrix
-    r: reward vector
-    gamma: discount factor
-    returns MSPBE
-    '''
-    D = np.diag(steady_dist)
-    projection = X @ np.linalg.inv(X.T @ D @ X) @ X.T @ D
-    pbe = projection @ (r + gamma * P @ v_hat - v_hat)
-    mspbe = steady_dist.dot(pbe**2)
-    return mspbe.item()
-
-
 def set_seed(seed: int):
     torch.manual_seed(seed)
     np.random.seed(seed)
@@ -260,11 +215,10 @@ def compare_sensitivity(tf,
         prompt.disable_query_grad()
 
         mean_cos_sim += steady_d[s]*cos_sim(tf_grad, tf_grad_hard)
-        mean_l2_dist += steady_d[s]*np.linalg.norm(tf_grad - tf_grad_hard)
-    return mean_cos_sim, mean_l2_dist
+    return mean_cos_sim
 
 
-def zero_order_comparison(v_tf: np.ndarray,
+def implicit_weight_sim(v_tf: np.ndarray,
                           tf_hard,
                           prompt):
     '''
@@ -283,73 +237,4 @@ def zero_order_comparison(v_tf: np.ndarray,
     prompt.zero_query_grad()
     prompt.disable_query_grad()
 
-    return cos_sim(w_tf, w_td), np.linalg.norm(w_tf - w_td)
-
-
-def first_order_comparison(tf,
-                           tf_hard,
-                           prompt):
-    '''
-    computes the cosine similarity and l2 distance
-    between the first order approximation of the batch TD transformer
-    and the linear transformer
-    '''
-    prompt = prompt.copy()
-    Phi: torch.Tensor = prompt.get_feature_mat()
-    steady_d: np.ndarray = prompt.mdp.steady_d
-    mean_cos_sim = 0.0
-    mean_l2_dist = 0.0
-    # loop over all the features
-    for s, feature in enumerate(Phi):
-        prompt.set_query(feature)
-        # TF approximation
-        prompt.enable_query_grad()
-        tf_v = tf.pred_v(prompt.z())
-        tf_v.backward()
-        tf_grad = prompt.query_grad().numpy()
-        prompt.zero_query_grad()
-
-        # Hardcoded approximation
-        tf_v_hard = tf_hard.pred_v(prompt.z())
-        tf_v_hard.backward()
-        tf_grad_hard = prompt.query_grad().numpy()
-        prompt.disable_query_grad()
-
-        first_order_tf = np.concatenate([tf_grad.flatten(), [tf_v.item()]])
-        first_order_hard = np.concatenate(
-            [tf_grad_hard.flatten(), [tf_v_hard.item()]])
-
-        # compute the cosine similarity weighted by the stationary distribution
-        mean_cos_sim += cos_sim(first_order_tf, first_order_hard) * steady_d[s]
-        mean_l2_dist += np.linalg.norm(first_order_tf -
-                                       first_order_hard) * steady_d[s]
-    return mean_cos_sim, mean_l2_dist
-
-
-def smooth_data(data: np.ndarray, window_size: int) -> np.ndarray:
-    '''
-    Smooth the data using a moving average window
-    data: input data to be smoothed
-    window_size: size of the moving average window
-    return: smoothed data
-    '''
-    padded_data = np.pad(data, (window_size//2, window_size//2), mode='edge')
-    window = np.ones(int(window_size))/float(window_size)
-    smoothed_data = np.convolve(padded_data, window, 'valid')
-    return smoothed_data
-
-
-if __name__ == '__main__':
-    from MRP.boyan import BoyanChain
-
-    set_seed(0)
-    X = np.random.randn(10, 3)
-    bc = BoyanChain(n_states=10)
-    w_msve = solve_msve_weight(bc.steady_d, X, bc.v)
-    print('MSVE Weight\n', w_msve)
-    msve = compute_msve(w_msve, bc.steady_d, X, bc.v)
-    print('MSVE\n', msve)
-    w_mspbe = solve_mspbe_weight(bc.steady_d, bc.P, X, bc.r, bc.gamma)
-    print('MSPBE Weight\n', w_mspbe)
-    mspbe = compute_mspbe(w_mspbe, bc.steady_d, bc.P, X, bc.r, bc.gamma)
-    print('MSPBE\n', mspbe)
+    return cos_sim(w_tf, w_td)

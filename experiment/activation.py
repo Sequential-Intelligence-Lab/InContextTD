@@ -14,5 +14,7 @@ def get_activation(activation: str) -> nn.Module:
         return nn.ELU()
     elif activation == 'selu':
         return nn.SELU()
+    elif activation == 'identity':
+        return nn.Identity()
     else:
         raise ValueError(f"Invalid activation function: {activation}")

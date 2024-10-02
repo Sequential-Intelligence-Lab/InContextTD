@@ -1,12 +1,8 @@
 import os
 from argparse import ArgumentParser, Namespace
 
-from experiment.plotter import (compute_weight_metrics,
-                                generate_attention_params_gif, get_hardcoded_P,
-                                get_hardcoded_Q, load_data,
-                                plot_attention_params, plot_error_data,
-                                plot_mean_attn_params, plot_multiple_runs,
-                                plot_weight_metrics, process_log)
+from experiment.plotter import (plot_mean_attn_params, plot_multiple_runs,
+                                )
 
 if __name__ == '__main__':
     linear_path = os.path.join('logs', 'linear_discounted_train', 'linear_good')
@@ -15,7 +11,7 @@ if __name__ == '__main__':
              'sequential', '1layer', '2layers',
              '4layers', 'sequential_2layers', 'sequential_4layers', 
              'large']
-    nonlinear_tasks = ['standard', 'sequential', 'representable', 'large', 'relu']
+    nonlinear_tasks = ['standard', 'sequential', 'representable']
 
     # We only want a subset of the final figures to be in the paper
     # We save those in a separate directory we can upload to Overleaf directly
