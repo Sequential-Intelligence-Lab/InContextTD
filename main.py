@@ -61,7 +61,7 @@ if __name__ == '__main__':
         start_time = datetime.datetime.now()
         sub_dir = 'linear' if args.linear else 'nonlinear'
         save_dir = os.path.join('./logs',
-                                f"{sub_dir}_discounted_train",
+                                f"{sub_dir}_train",
                                 start_time.strftime("%Y-%m-%d-%H-%M-%S"))
     if args.suffix:
         save_dir += f'_{args.suffix}'

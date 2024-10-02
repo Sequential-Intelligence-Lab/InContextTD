@@ -31,7 +31,7 @@ def _init_save_dir(save_dir: str) -> None:
     if save_dir is None:
         startTime = datetime.datetime.now()
         save_dir = os.path.join('./logs',
-                                "linear_discounted_train",
+                                "train",
                                 startTime.strftime("%Y-%m-%d-%H-%M-%S"))
 
     # Create directory if it doesn't exist
@@ -90,10 +90,10 @@ def train(d: int,
     tf = Transformer(d, n, l, lmbd, activation=activation, mode=mode) # trainable transformer
     tf_batch_td = HardLinearTransformer(d, n, l, lmbd) # this is the hardcoded transformer that implements Batch TD with fixed weights
 
-    opt = optim.Adam(tf.parameters(), lr=lr, weight_decay=weight_decay)
-    opt_hard = optim.Adam(tf_batch_td.parameters(), lr=lr,
-                          weight_decay=weight_decay)
-
+    opt = optim.Adam(tf.parameters(), lr=lr, weight_decay=weight_decay)    
+    import pdb; pdb.set_trace()
+    opt_hard = optim.Adam(tf_batch_td.parameters(), lr=lr, weight_decay=weight_decay)
+    import pdb; pdb.set_trace()
     log = _init_log()
 
     pro_gen = MDPPromptGenerator(s, d, n, gamma)
