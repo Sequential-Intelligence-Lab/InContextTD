@@ -91,9 +91,7 @@ def train(d: int,
     tf_batch_td = HardLinearTransformer(d, n, l, lmbd) # this is the hardcoded transformer that implements Batch TD with fixed weights
 
     opt = optim.Adam(tf.parameters(), lr=lr, weight_decay=weight_decay)    
-    import pdb; pdb.set_trace()
     opt_hard = optim.Adam(tf_batch_td.parameters(), lr=lr, weight_decay=weight_decay)
-    import pdb; pdb.set_trace()
     log = _init_log()
 
     pro_gen = MDPPromptGenerator(s, d, n, gamma)

@@ -112,7 +112,7 @@ class Transformer(nn.Module):
 
 
 class HardLinearAttention(nn.Module):
-    def __init__(self, d: int, n: int, alpha: float, lmbd: float = 0.0):
+    def __init__(self, d: int, n: int, lmbd: float = 0.0):
         '''
         d: feature dimension
         n: context length
@@ -122,7 +122,7 @@ class HardLinearAttention(nn.Module):
 
         self.d = d
         self.n = n
-        self.alpha = alpha  * nn.Parameter(torch.ones(1))
+        self.alpha = nn.Parameter(torch.ones(1))
         P = torch.zeros((2 * d + 1, 2 * d + 1))
         P[-1, -1] = 1.0
         self.P = P
@@ -162,7 +162,7 @@ class HardLinearTransformer(nn.Module):
         self.d = d
         self.n = n
         self.l = l
-        self.attn = HardLinearAttention(d, n, alpha, lmbd)
+        self.attn = HardLinearAttention(d, n, lmbd)
 
     def forward(self, Z):
         '''

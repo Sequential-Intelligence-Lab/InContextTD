@@ -123,7 +123,6 @@ def verify(d, n, l):
         w, v = pro.td_update(w, tf.Cs[i])
         td_value.append(v)
     td_value = np.array(td_value).flatten()
-    #import pdb; pdb.set_trace()
     print(tf_diff_value -  td_value)
 
 
