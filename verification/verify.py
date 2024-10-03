@@ -4,9 +4,9 @@ import numpy as np
 import torch
 from tqdm import tqdm
 
-from theory_verification.model import (AVGREWTDTransformer,
+from verification.model import (AVGREWTDTransformer,
                                        DiscountedTDTransformer, RGTransformer)
-from theory_verification.prompt import Prompt
+from verification.prompt import Prompt
 
 torch.set_default_dtype(torch.float64)
 
@@ -93,7 +93,7 @@ def verify(d: int, n: int, l: int, num_trials: int = 30):
 
 
 if __name__ == '__main__':
-    from theory_verification.plot import plot_error
+    from verification.plot import plot_error
     torch.manual_seed(42)
     np.random.seed(42)
     verify(3, 100, 40, 30)
