@@ -9,7 +9,7 @@ import scienceplots
 import seaborn as sns
 
 from experiment.utils import (check_params, compare_P, compare_Q,
-                              get_hardcoded_P, get_hardcoded_Q, scale, smooth_data)
+                              get_hardcoded_P, get_hardcoded_Q, scale)
 
 
 def load_data(data_dir: str) -> Tuple[dict, dict]:
@@ -35,19 +35,8 @@ def process_log(log: dict) -> Tuple[np.ndarray, dict, dict]:
     attn_params = {'P': aligned_Ps, 'Q': aligned_Qs, 'alpha': alphas}
 
     error_log = {}
-    for key in ('mstde',
-                'mstde hard',
-                'true msve',
-                'transformer msve',
-                'batch td msve',
-                'transformer mspbe',
-                'batch td mspbe',
-                'zero order cos sim',
-                'zero order l2 dist',
-                'first order cos sim',
-                'first order l2 dist',
+    for key in ('zero order cos sim',
                 'sensitivity cos sim',
-                'sensitivity l2 dist',
                 'v_tf v_td msve'):
         if key in log:
             error_log[key] = np.expand_dims(log[key], axis=0)
@@ -137,8 +126,6 @@ def plot_mean_attn_params(data_dirs: List[str],
     # mean over seeds
     mean_Ps = np.mean(Ps, axis=0)
     mean_Qs = np.mean(Qs, axis=0)
-    mean_alphas = np.mean(alphas, axis=0)
-    std_alphas = np.std(alphas, axis=0)
 
     for l, (P, Q) in enumerate(zip(mean_Ps, mean_Qs)):  # shape (2d+1, 2d+1)
         P = scale(P)
@@ -167,16 +154,6 @@ def plot_mean_attn_params(data_dirs: List[str],
         final_save_path = os.path.join(final_figures_dir, f'PQ_mean_{l+1}_{step}.pdf')
         plt.savefig(final_save_path, dpi=300, format="pdf")
         plt.close(fig)
-
-    fig = plt.figure(figsize=(10, 5))
-    plt.plot(xs, mean_alphas)
-    plt.fill_between(xs, mean_alphas - std_alphas,
-                     mean_alphas + std_alphas, alpha=0.2)
-    plt.xlabel('# MRPs')
-    plt.ylabel('Alpha')
-    plt.title('Mean Alpha vs # MRPs')
-    plt.savefig(os.path.join(attn_dir, 'alpha.pdf'),format='pdf')
-    plt.close(fig)
 
 def get_tf_title(params: dict) -> str:
     # specify that there is no activation function for linear transformers
@@ -212,80 +189,10 @@ def plot_error_data(xs: np.ndarray,
     if not os.path.exists(error_dir):
         os.makedirs(error_dir)
 
-    transformer_title = get_tf_title(params)
-
     # set plotting style (ieee supports color blindness)
     plt.style.use(['science', 'vibrant', 'no-latex'])
 
     num_seeds = error_log['mstde'].shape[0]
-
-    # MSTDE
-    mean_mstde = np.mean(error_log['mstde'], axis=0)
-    std_mstde = np.std(error_log['mstde'], axis=0)
-    mean_mstde_hard = np.mean(error_log['mstde hard'], axis=0)
-    std_mstde_hard = np.std(error_log['mstde hard'], axis=0)
-    fig = plt.figure()
-    plt.plot(xs, mean_mstde, label='MSTDE')
-    plt.fill_between(xs, mean_mstde - std_mstde,
-                     mean_mstde + std_mstde, alpha=0.2)
-    plt.plot(xs, mean_mstde_hard, label='MSTDE Hard')
-    plt.fill_between(xs, mean_mstde_hard - std_mstde_hard,
-                     mean_mstde_hard + std_mstde_hard, alpha=0.2)
-    plt.xlabel('# MRPs')
-    plt.ylabel('Loss (MSTDE)')
-    plt.title('Training Loss (MSTDE)')
-    plt.legend()
-    plt.savefig(os.path.join(error_dir, 'loss_mstde.pdf'), dpi=300, format='pdf')
-    plt.close(fig)
-
-    # Value error
-    mean_tf_msve = np.mean(error_log['transformer msve'], axis=0)
-    std_tf_msve = np.std(error_log['transformer msve'], axis=0)
-
-    fig = plt.figure()
-    plt.plot(xs, mean_tf_msve, label='TF')
-    plt.fill_between(xs, mean_tf_msve - std_tf_msve,
-                     mean_tf_msve + std_tf_msve, alpha=0.2)
-    if params['linear']:
-        mean_td_msve = np.mean(error_log['batch td msve'], axis=0)
-        std_td_msve = np.std(error_log['batch td msve'], axis=0)
-        mean_true_msve = np.mean(error_log['true msve'], axis=0)
-        std_true_msve = np.std(error_log['true msve'], axis=0)
-
-        plt.plot(xs, mean_td_msve, label='TD')
-        plt.fill_between(xs, mean_td_msve - std_td_msve,
-                         mean_td_msve + std_td_msve, alpha=0.2)
-        plt.plot(xs, mean_true_msve, label='True Min')
-        plt.fill_between(xs, mean_true_msve - std_true_msve,
-                         mean_true_msve + std_true_msve, alpha=0.2)
-    plt.xlabel('# MRPs')
-    plt.ylabel('MSVE')
-    plt.title('MSVE vs # MRPs')
-    plt.legend()
-    plt.savefig(os.path.join(error_dir, 'msve.pdf'), dpi=300, format='pdf')
-    plt.close(fig)
-
-    if params['linear']:  # MSPBE only computable for linear TF
-        # MSPBE
-        mean_tf_mspbe = np.mean(error_log['transformer mspbe'], axis=0)
-        std_tf_mspbe = np.std(error_log['transformer mspbe'], axis=0)
-        mean_td_mspbe = np.mean(error_log['batch td mspbe'], axis=0)
-        std_td_mspbe = np.std(error_log['batch td mspbe'], axis=0)
-        fig = plt.figure()
-        plt.plot(xs, mean_tf_mspbe, label='$TF_{\theta}$')
-        plt.fill_between(xs, mean_tf_mspbe - std_tf_mspbe,
-                         mean_tf_mspbe + std_tf_mspbe, alpha=0.2)
-        plt.plot(xs, mean_td_mspbe, label='$TD$')
-        plt.fill_between(xs, mean_td_mspbe - std_td_mspbe,
-                         mean_td_mspbe + std_td_mspbe, alpha=0.2)
-        plt.xlabel('# MRPs')
-        plt.ylabel('MSPBE')
-        plt.ylim(0)
-        plt.title(f"{transformer_title}\n MSPBE")
-        plt.legend(frameon=True, framealpha=0.8,
-                   fontsize='small').set_alpha(0.5)
-        plt.savefig(os.path.join(error_dir, 'mspbe.pdf'), dpi=300, format='pdf')
-        plt.close(fig)
 
     # Value function similarity
     mean_vf_sim = np.mean(error_log['v_tf v_td msve'], axis=0)
@@ -323,15 +230,11 @@ def plot_error_data(xs: np.ndarray,
     c, = ax2.plot(xs, mean_vf_sim, label='VD', color=sns.color_palette()[1])
     ax2.fill_between(xs, mean_vf_sim - stde_vf_sim,
                      mean_vf_sim + stde_vf_sim, lw=0, alpha=0.3, color=sns.color_palette()[1])
-    #ax2.set_ylim(0, 2.5)
-    #ax1.set_zorder(ax2.get_zorder() + 1) # bring axis 1 to the front
     p = [a, b, c]
     if params['linear']:
         ax2.legend(p, [p_.get_label() for p_ in p], frameon=True, framealpha=0.8, loc='center right').set_alpha(0.5)
     else:
         ax2.legend(p, [p_.get_label() for p_ in p], frameon=True, framealpha=0.8, loc='upper left').set_alpha(0.5)
-    #fig.tight_layout()
-    #fig.set_size_inches(5, 8)
     plt.savefig(os.path.join(error_dir, 'cos_similarity.pdf'), dpi=300, format='pdf')
     # save a copy in the final figures directory
     plt.savefig(os.path.join(final_figures_dir, 'cos_similarity.pdf'), dpi=300, format='pdf')
@@ -342,7 +245,7 @@ def plot_attention_params(xs: np.ndarray,
                           params: dict,
                           save_dir: str,
                           log_step: int = -1,
-                          plot_alpha: bool = True) -> List[str]:
+                          ) -> List[str]:
     '''
     visualize the attention parameters at a specific time step
     xs: x-axis values
@@ -378,16 +281,6 @@ def plot_attention_params(xs: np.ndarray,
         plt.savefig(save_path, dpi=300, format = 'pdf')
         plt.close(fig)
         paths.append(save_path)
-
-    if plot_alpha:
-        alphas = params['alpha']
-        fig = plt.figure(figsize=(10, 5))
-        plt.plot(xs, alphas)
-        plt.xlabel('# MRPs')
-        plt.ylabel('Alpha')
-        plt.title('Alpha vs # MRPs')
-        plt.savefig(os.path.join(attn_dir, 'alpha.pdf'))
-        plt.close(fig)
 
     return paths
 
