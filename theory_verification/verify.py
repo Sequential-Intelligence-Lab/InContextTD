@@ -93,6 +93,8 @@ def verify(d: int, n: int, l: int, num_trials: int = 30):
 
 
 if __name__ == '__main__':
+    from theory_verification.plot import plot_error
     torch.manual_seed(42)
     np.random.seed(42)
     verify(3, 100, 40, 30)
+    plot_error()
