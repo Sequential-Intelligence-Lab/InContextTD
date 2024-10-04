@@ -8,7 +8,7 @@ import torch.optim as optim
 from tqdm import tqdm
 
 from experiment.model import HardLinearTransformer, Transformer
-from experiment.prompt import MDPPromptGenerator
+from experiment.prompt import MRPPromptGenerator
 from experiment.utils import (compare_sensitivity, compute_msve, set_seed,
                                implicit_weight_sim)
 from MRP.mrp import MRP
@@ -94,7 +94,7 @@ def train(d: int,
     opt_hard = optim.Adam(tf_batch_td.parameters(), lr=lr, weight_decay=weight_decay)
     log = _init_log()
 
-    pro_gen = MDPPromptGenerator(s, d, n, gamma)
+    pro_gen = MRPPromptGenerator(s, d, n, gamma)
 
     ### Training Loop ###
     for i in tqdm(range(1, n_mdps+1)):

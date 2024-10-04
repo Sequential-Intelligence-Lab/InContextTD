@@ -1,4 +1,3 @@
-import datetime
 import os
 
 import matplotlib.pyplot as plt
@@ -7,7 +6,7 @@ import scienceplots
 import torch
 from tqdm import tqdm
 
-from experiment.prompt import Feature, MDPPrompt, MDPPromptGenerator
+from experiment.prompt import Feature, MRPPrompt
 from experiment.utils import compute_msve, set_seed
 from MRP.loop import Loop
 
@@ -34,7 +33,7 @@ if __name__ == '__main__':
         mrp = Loop(s, gamma, threshold=thd, weight=true_w, Phi=feature.phi)
         msve_n = []
         for n in context_lengths:
-            prompt = MDPPrompt(d, n, gamma, mrp, feature)
+            prompt = MRPPrompt(d, n, gamma, mrp, feature)
             prompt.reset()
             w = torch.zeros((d, 1))
             for _ in range(l):
@@ -61,5 +60,4 @@ if __name__ == '__main__':
     plt.grid(True)
     fig_path = os.path.join('logs', 'demo', 'msve_vs_context_length.pdf')
     plt.savefig(fig_path, dpi=300, format='pdf')
-    plt.show()
     plt.close(fig)
