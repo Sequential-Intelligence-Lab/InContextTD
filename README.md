@@ -64,11 +64,14 @@ By default, the runs will save in `./logs/YYYY-MM-DD-HH-MM-SS` format.
 
 For example, to replicate Figure 1 in the paper, run
 ```bash
-python main.py python main.py --suffix=linear_standard --linear -v
+python main.py python main.py --suffix=linear_standard --l 3 --activation identity --mode auto -v
 ```
 and the figures averaged across all the seeds will be saved in `./logs/YYYY-MM-DD-HH-MM-SS/linear_standard/averaged_figures`, with diagnostic figures for each seed stored in `./logs/YYYY-MM-DD-HH-MM-SS/linear_standard/seed_SEED/figures`.
 
-add plots here
+It will yield the following plots
+![P Metrics Plot](figs/P_metrics_1.pdf)
+![Q Metrics Plot](figs/Q_metrics_1.pdf)
+
 
 
 To reproduce all figures in the paper, simply run the shell script
