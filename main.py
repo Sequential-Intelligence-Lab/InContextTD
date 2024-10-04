@@ -137,6 +137,9 @@ if __name__ == '__main__':
     
     # average across the seeds now
     average_figures_dir = os.path.join(save_dir, 'figures')
+    if not os.path.exists(average_figures_dir):
+        os.makedirs(average_figures_dir)
+
     plot_error_data(data_dirs, average_figures_dir)
     plot_attn_params(data_dirs, average_figures_dir)
     if args.linear:

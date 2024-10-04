@@ -213,10 +213,7 @@ def plot_weight_metrics(data_dirs: str,
                         save_dir: str) -> None:
     '''
     plot the metrics for P and Q
-    xs: x-axis values
-    l: number of layers
-    P_metrics: metrics for P matrix
-    Q_metrics: metrics for Q matrix
+    data_dirs: list of directories containing the data
     save_dir: directory to save the plots
     '''
 
@@ -323,8 +320,6 @@ def compute_weight_metrics(attn_params: dict,
     '''
     compute the metrics for the attention parameters
     attn_params: attention parameters from the transformer
-    P_true: hard coded true P matrix
-    Q_true: hard coded true Q matrix
     d: feature dimension
     '''
 

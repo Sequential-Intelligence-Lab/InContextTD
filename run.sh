@@ -1,23 +1,23 @@
 ####################################################### linear transformer ####################################################### 
-python main.py --suffix=linear_standard --linear -v  & # standard
+python main.py --suffix=linear_standard --linear   # standard
 sleep 2
-python main.py --suffix=linear_2layers -l=2 --linear -v & # 2 layers auto
+python main.py --suffix=linear_2layers -l=2 --linear  # 2 layers auto
 sleep 2
-python main.py --suffix=linear_4layers -l=4 --linear -v & # 4 layers auto
+python main.py --suffix=linear_4layers -l=4 --linear  # 4 layers auto
 sleep 2
-python main.py --suffix=linear_sequential --mode=sequential --linear -v & # standard sequential
+python main.py --suffix=linear_sequential --mode=sequential --linear # standard sequential
 sleep 2
-python main.py --suffix=linear_sequential_2layers -l=2 --mode=sequential --linear -v &  # 2 layer sequential
+python main.py --suffix=linear_sequential_2layers -l=2 --mode=sequential --linear  # 2 layer sequential
 sleep 2
-python main.py --suffix=linear_sequential_4layers -l=4 --mode=sequential --linear -v & # 4 layer sequential
+python main.py --suffix=linear_sequential_4layers -l=4 --mode=sequential --linear -v # 4 layer sequential
 sleep 2
-python main.py --suffix=linear_large -d=8 -s=20 -n=60 --linear -v & # larger scale
+python main.py --suffix=linear_large -d=8 -s=20 -n=60 --linear -v # larger scale
 sleep 2
 wait
 
 ####################################################### non-linear transformer #######################################################
-python main.py --suffix=nonlinear_standard -v & # standard
+python main.py --suffix=nonlinear_standard # standard
 sleep 2
-python main.py --suffix=nonlinear_representable --sample_weight -v & # representable value function
+python main.py --suffix=nonlinear_representable --sample_weight # representable value function
 sleep 2
 wait # wait for all background jobs to finish
