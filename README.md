@@ -29,10 +29,10 @@ python main.py --suffix=linear_standard --activation=identity --mode=auto -v
 ```
 This will generate the following plots:
 <p align="center">
-  <img src="figs/P_metrics_1-1.png" alt="P Metrics Plot" width="200"/>
-  <img src="figs/Q_metrics_1-1.png" alt="Q Metrics Plot" width="200"/>
-  <img src="figs/PQ_mean_1_4000-1.png" alt="Final Learned P and Q" width="325"/>
-  <img src="figs/cos_similarity-1.png" alt="Batch TD Comparison" width="250"/>
+  <img src="figs/P_metrics_1-1.png" alt="P Metrics Plot" height="180"/>
+  <img src="figs/Q_metrics_1-1.png" alt="Q Metrics Plot" height="180"/>
+  <img src="figs/PQ_mean_1_4000-1.png" alt="Final Learned P and Q" height="180"/>
+  <img src="figs/cos_similarity-1.png" alt="Batch TD Comparison" height="180"/>
 </p>
 The generated figures will be saved in:
 
@@ -53,7 +53,7 @@ Below is a list of the command-line arguments available for `main.py`:
 - `-l`, `--num_layers`: Number of transformer layers (default: 3)
 - `--gamma`: Discount factor (default: 0.9)
 - `--activation`: Activation function (choices: ['identity', 'softmax', 'relu'])
-- `--sample_weight`: Flag to randomly sample a true weight vector that allows the value function to be fully represented by the features
+- `--representable`: Flag to randomly sample a true weight vector that allows the value function to be fully represented by the features
 - `--n_mrps`: Number of MRPs used for training (default: 4000)
 - `--batch_size`: Mini-batch size (default: 64)
 - `--n_batch_per_mrp`: Number of mini-batches sampled per MRP (default: 5)
