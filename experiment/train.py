@@ -9,9 +9,9 @@ from tqdm import tqdm
 
 from experiment.model import HardLinearTransformer, Transformer
 from experiment.prompt import MRPPromptGenerator
-from experiment.utils import (compare_sensitivity, compute_msve, set_seed,
-                               implicit_weight_sim)
 from MRP.mrp import MRP
+from utils import (compare_sensitivity, compute_msve, implicit_weight_sim,
+                   set_seed)
 
 
 def _init_log() -> dict:
@@ -50,7 +50,6 @@ def train(d: int,
           n: int,
           l: int,
           gamma: float = 0.9,
-          lmbd: float = 0.0,
           activation: str = 'identity',
           sample_weight: bool = False,
           mode: str = 'auto',
@@ -68,7 +67,6 @@ def train(d: int,
     n: context length
     l: number of layers
     gamma: discount factor
-    lmbd: eligibility trace decay
     activation: activation function (e.g. softmax, identity, relu)
     sample_weight: sample a random true weight vector
     mode: 'auto' or 'sequential'
@@ -87,8 +85,8 @@ def train(d: int,
     set_seed(random_seed)
 
    
-    tf = Transformer(d, n, l, lmbd, activation=activation, mode=mode) # trainable transformer
-    tf_batch_td = HardLinearTransformer(d, n, l, lmbd) # this is the hardcoded transformer that implements Batch TD with fixed weights
+    tf = Transformer(d, n, l, activation=activation, mode=mode) # trainable transformer
+    tf_batch_td = HardLinearTransformer(d, n, l) # this is the hardcoded transformer that implements Batch TD with fixed weights
 
     opt = optim.Adam(tf.parameters(), lr=lr, weight_decay=weight_decay)    
     opt_hard = optim.Adam(tf_batch_td.parameters(), lr=lr, weight_decay=weight_decay)
@@ -169,7 +167,6 @@ def train(d: int,
         's': s,
         'n': n,
         'l': l,
-        'lmbd': lmbd,
         'gamma': gamma,
         'sample_weight': sample_weight,
         'n_mrps': n_mrps,

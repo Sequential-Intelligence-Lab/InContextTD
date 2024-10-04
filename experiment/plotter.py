@@ -8,8 +8,7 @@ import numpy as np
 import scienceplots
 import seaborn as sns
 
-from experiment.utils import (check_params, compare_P, compare_Q,
-                               scale)
+from utils import check_params, compare_P, compare_Q, scale
 
 
 def load_data(data_dir: str) -> Tuple[dict, dict]:

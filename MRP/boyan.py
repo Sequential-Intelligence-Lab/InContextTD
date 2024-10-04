@@ -2,8 +2,8 @@ from typing import Tuple
 
 import numpy as np
 
-from experiment.utils import compute_steady_dist
 from MRP.mrp import MRP
+from utils import compute_steady_dist
 
 
 class BoyanChain(MRP):
