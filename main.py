@@ -42,7 +42,7 @@ if __name__ == '__main__':
                         help='discount factor', default=0.9)
     parser.add_argument('--activation', type=str,
                         help='activation function for the transformer', default='identity')
-    parser.add_argument('--sample_weight', action='store_true',
+    parser.add_argument('--representable', action='store_true',
                         help='sample a random true weight vector, such that the value function is fully representable by the features')
     parser.add_argument('--n_mrps', type=int,
                         help='total number of MRPs for training ', default=4_000)
@@ -87,7 +87,7 @@ if __name__ == '__main__':
         l=args.num_layers,
         gamma=args.gamma,
         activation=args.activation,
-        sample_weight=args.sample_weight,
+        sample_weight=args.representable,
         mode=args.mode,
         lr=args.lr,
         weight_decay=args.weight_decay,
@@ -106,7 +106,7 @@ if __name__ == '__main__':
         print(f"Context length: {args.context_length}")
         print(f"Number of states in the MRP: {args.num_states}")
         print(f"Discount factor: {args.gamma}")
-        tf_v = 'representable' if args.sample_weight else 'unrepresentable'
+        tf_v = 'representable' if args.representable else 'unrepresentable'
         print(f"Value function is {tf_v} by the features.")
         print(f"Number of MRPs for training: {args.n_mrps}")
         print(f'Number of mini-batches per MRP: {args.n_batch_per_mrp}')
