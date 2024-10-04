@@ -197,7 +197,7 @@ def compare_sensitivity(tf,
     '''
     prompt = prompt.copy()
     Phi: torch.Tensor = prompt.get_feature_mat()
-    steady_d: np.ndarray = prompt.mdp.steady_d
+    steady_d: np.ndarray = prompt.mrp.steady_d
     mean_cos_sim = 0.0
     mean_l2_dist = 0.0
     for s, feature in enumerate(Phi):
@@ -227,7 +227,7 @@ def implicit_weight_sim(v_tf: np.ndarray,
     and the weight of the best linear model that explaines v_tf
     '''
     prompt = prompt.copy()
-    steady_d = prompt.mdp.steady_d
+    steady_d = prompt.mrp.steady_d
     Phi = prompt.get_feature_mat().numpy()
     w_tf = solve_msve_weight(steady_d, Phi, v_tf).flatten()
     prompt.enable_query_grad()

@@ -28,12 +28,12 @@ if __name__ == '__main__':
                         help='activation function for the transformer', default='softmax')
     parser.add_argument('--sample_weight', action='store_true',
                         help='sample a random true weight vector, such that the value function is fully representable by the features')
-    parser.add_argument('--n_mdps', type=int,
-                        help='total number of MDPs for training ', default=4_000)
+    parser.add_argument('--n_mrps', type=int,
+                        help='total number of MRPs for training ', default=4_000)
     parser.add_argument('--batch_size', type=int,
                         help='mini batch size', default=64)
-    parser.add_argument('--n_batch_per_mdp', type=int,
-                        help='number of mini-batches sampled from each MDP', default=5)
+    parser.add_argument('--n_batch_per_mrp', type=int,
+                        help='number of mini-batches sampled from each MRP', default=5)
     parser.add_argument('--lr', type=float,
                         help='learning rate', default=0.001)
     parser.add_argument('--weight_decay', type=float,
@@ -75,16 +75,16 @@ if __name__ == '__main__':
                 f"Training a nonlinear {args.mode} transformer of {args.num_layers} layer(s) with {args.activation} activation.")
         print(f"Feature dimension: {args.dim_feature}")
         print(f"Context length: {args.context_length}")
-        print(f"Number of states in the MDP: {args.num_states}")
+        print(f"Number of states in the MRP: {args.num_states}")
         print(f"Discount factor: {args.gamma}")
         print(f"Eligibility trace decay rate: {args.lmbd}")
         tf_v = 'representable' if args.sample_weight else 'unrepresentable'
         print(f"Value function is {tf_v} by the features.")
-        print(f"Number of MDPs for training: {args.n_mdps}")
-        print(f'Number of mini-batches per MDP: {args.n_batch_per_mdp}')
+        print(f"Number of MRPs for training: {args.n_mrps}")
+        print(f'Number of mini-batches per MRP: {args.n_batch_per_mrp}')
         print(f'Mini-batch size: {args.batch_size}')
         print(
-            f'Total number of prompts for training: {args.n_mdps * args.n_batch_per_mdp * args.batch_size}')
+            f'Total number of prompts for training: {args.n_mrps * args.n_batch_per_mrp * args.batch_size}')
         print(f'Learning rate: {args.lr}')
         print(f'Regularization term: {args.weight_decay}')
         print(f'Logging interval: {args.log_interval}')
@@ -106,9 +106,9 @@ if __name__ == '__main__':
             mode=args.mode,
             lr=args.lr,
             weight_decay=args.weight_decay,
-            n_mdps=args.n_mdps,
+            n_mrps=args.n_mrps,
             mini_batch_size=args.batch_size,
-            n_batch_per_mdp=args.n_batch_per_mdp,
+            n_batch_per_mrp=args.n_batch_per_mrp,
             log_interval=args.log_interval,
             save_dir=data_dir,
             random_seed=seed
