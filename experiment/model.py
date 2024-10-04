@@ -8,24 +8,21 @@ class Attention(nn.Module):
     def __init__(self,
                  d: int,
                  n: int,
-                 lmbd: float = 0.0,
-                 activation: str = 'softmax'):
+                 activation: str):
         '''
         d: feature dimension
         n: context length
-        lmbd: eligibility trace decay
+        actvation: activation function
         '''
         super(Attention, self).__init__()
         self.d = d
         self.n = n
         self.activation = get_activation(activation)
-        M = torch.eye(n + 1)
-        for col in range(n):
-            for row in range(col + 1, n):
-                M[row, col] = lmbd * M[row - 1, col]
-        M[-1, -1] = 0
 
+        M = torch.eye(n + 1)
+        M[-1, -1] = 0
         self.M = M
+
         self.P = nn.Parameter(torch.empty(2 * d + 1, 2 * d + 1))
         self.Q = nn.Parameter(torch.empty(2 * d + 1, 2 * d + 1))
 
@@ -39,31 +36,28 @@ class Transformer(nn.Module):
                  d: int,
                  n: int,
                  l: int,
-                 lmbd: float = 0.0,
-                 activation: str = 'softmax',
+                 activation: str,
                  mode='auto'):
         '''
         d: feature dimension
         n: context length
         l: number of layers
-        lmbd: eligibility trace decay
-        activation: activation function (e.g. softmax, identity, relu)
+        activation: activation function (e.g. identity, softmax, identity, relu)
         mode: 'auto' or 'sequential'
         '''
         super(Transformer, self).__init__()
         self.d = d
         self.n = n
         self.l = l
-        self.lmbd = lmbd
         self.mode = mode
         if mode == 'auto':
-            attn = Attention(d, n, lmbd, activation)
+            attn = Attention(d, n, activation)
             nn.init.xavier_normal_(attn.P, gain=0.1)
             nn.init.xavier_normal_(attn.Q, gain=0.1)
             self.attn = attn
         elif mode == 'sequential':
             self.layers = nn.ModuleList(
-                [Attention(d, n, lmbd, activation) for _ in range(l)])
+                [Attention(d, n, activation) for _ in range(l)])
             for attn in self.layers:
                 nn.init.xavier_normal_(attn.P, gain=0.1/l)
                 nn.init.xavier_normal_(attn.Q, gain=0.1/l)
@@ -84,14 +78,14 @@ class Transformer(nn.Module):
 
     def fit_value_func(self,
                        context: torch.Tensor,
-                       X: torch.Tensor) -> torch.Tensor:
+                       phi: torch.Tensor) -> torch.Tensor:
         '''
         context: the context of shape
-        X: features of shape (s, d)
+        phi: features of shape (s, d)
         returns the fitted value function given the context in shape (s, 1)
         '''
         v_vec = []
-        for feature in X:
+        for feature in phi:
             feature_col = torch.zeros((2 * self.d + 1, 1))
             feature_col[:self.d, 0] = feature
             Z_p = torch.cat([context, feature_col], dim=1)
@@ -103,7 +97,6 @@ class Transformer(nn.Module):
     def pred_v(self, Z: torch.Tensor) -> torch.Tensor:
         '''
         Z: prompt of shape (2*d+1, n+1)
-        manual: whether to use manual weight extraction or not
         predict the value of the query feature
         '''
         Z_tf = self.forward(Z)
@@ -111,11 +104,10 @@ class Transformer(nn.Module):
 
 
 class HardLinearAttention(nn.Module):
-    def __init__(self, d: int, n: int, lmbd: float = 0.0):
+    def __init__(self, d: int, n: int):
         '''
         d: feature dimension
         n: context length
-        lmbd: eligibility trace decay
         '''
         super(HardLinearAttention, self).__init__()
 
@@ -127,9 +119,6 @@ class HardLinearAttention(nn.Module):
         self.P = P
 
         M = torch.eye(n+1)
-        for col in range(n):
-            for row in range(col+1, n):
-                M[row, col] = lmbd*M[row-1, col]
         M[-1, -1] = 0
         self.M = M
 
@@ -148,19 +137,17 @@ class HardLinearTransformer(nn.Module):
     def __init__(self,
                  d: int,
                  n: int,
-                 l: int,
-                 lmbd: float = 0.0):
+                 l: int):
         '''
         d: feature dimension
         n: context length
         l: number of layers
-        lmbd: eligibility trace decay
         '''
         super(HardLinearTransformer, self).__init__()
         self.d = d
         self.n = n
         self.l = l
-        self.attn = HardLinearAttention(d, n, lmbd)
+        self.attn = HardLinearAttention(d, n)
 
     def forward(self, Z):
         '''
@@ -173,14 +160,14 @@ class HardLinearTransformer(nn.Module):
 
     def fit_value_func(self,
                        context: torch.Tensor,
-                       X: torch.Tensor) -> torch.Tensor:
+                       phi: torch.Tensor) -> torch.Tensor:
         '''
         context: the context of shape (2*d+1, n)
-        X: features of shape (s, d)
+        phi: features of shape (s, d)
         returns the fitted value function given the context in shape (s, 1)
         '''
         tf_v = []
-        for feature in X:
+        for feature in phi:
             feature_col = torch.zeros((2*self.d+1, 1))
             feature_col[:self.d, 0] = feature
             Z_p = torch.cat([context, feature_col], dim=1)
@@ -192,12 +179,12 @@ class HardLinearTransformer(nn.Module):
     def pred_v(self, Z: torch.Tensor) -> torch.Tensor:
         '''
         Z: prompt of shape (2*d+1, n+1)
-        manual: whether to use manual weight extraction or not
         predict the value of the query feature
         '''
         Z_tf = self.forward(Z)
         return -Z_tf[-1, -1]
-    
+
+
 def get_activation(activation: str) -> nn.Module:
     if activation == 'relu':
         return nn.ReLU()
@@ -215,26 +202,3 @@ def get_activation(activation: str) -> nn.Module:
         return nn.Identity()
     else:
         raise ValueError(f"Invalid activation function: {activation}")
-
-
-if __name__ == '__main__':
-    from experiment.prompt import MDPPromptGenerator
-    d = 2
-    s = 10
-    n = 6
-    l = 1
-    torch.random.manual_seed(0)
-    np.random.seed(0)
-    gamma = 0.9
-    lmbd = 0.0
-    prompt_gen = MDPPromptGenerator(s, d, n, gamma)
-    prompt_gen.reset_feat()
-    prompt_gen.reset_mdp(sample_weight=False)
-    mdp_prompt = prompt_gen.get_prompt()
-    Z_0 = mdp_prompt.reset()
-    tf = Transformer(d, n, l, lmbd, mode='auto')
-    v_func = tf.fit_value_func(mdp_prompt.context(
-    ), mdp_prompt.get_feature_mat(), manual=False)
-    print(v_func.shape)
-    v_tf = tf.pred_v(Z_0.to(torch.float))
-    print(v_tf)

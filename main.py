@@ -4,9 +4,10 @@ from argparse import ArgumentParser, Namespace
 from joblib import Parallel, delayed
 
 from experiment.train import train
-from experiment.plotter import ( load_data,
+from experiment.plotter import (load_data,
                                 plot_attn_params, plot_error_data,
                                 plot_weight_metrics)
+
 
 def run_training_for_seed(seed: int, train_args: Namespace, is_linear: bool):
     data_dir = os.path.join(train_args['save_dir'], f'seed_{seed}')
@@ -23,12 +24,14 @@ def run_training_for_seed(seed: int, train_args: Namespace, is_linear: bool):
     plot_error_data([data_dir], figure_dir)
     plot_attn_params([data_dir], figure_dir)
     if is_linear:
-        plot_weight_metrics([data_dir], figure_dir)  # the weight metrics are only sensible for linear transformers
+        # the weight metrics are only sensible for linear transformers
+        plot_weight_metrics([data_dir], figure_dir)
+
 
 if __name__ == '__main__':
     parser = ArgumentParser()
-    parser.add_argument('--linear', help='specify whether to train a linear or nonlinear transformer',
-                        action='store_true')
+    # parser.add_argument('--linear', help='specify whether to train a linear or nonlinear transformer',
+    #                     action='store_true')
     parser.add_argument('-d', '--dim_feature', type=int,
                         help='feature dimension', default=4)
     parser.add_argument('-s', '--num_states', type=int,
@@ -39,10 +42,8 @@ if __name__ == '__main__':
                         help='number of layers', default=3)
     parser.add_argument('--gamma', type=float,
                         help='discount factor', default=0.9)
-    parser.add_argument('--lmbd', type=float,
-                        help='eligibility trace decay rate', default=0.0)
     parser.add_argument('--activation', type=str,
-                        help='activation function for the transformer', default='softmax')
+                        help='activation function for the transformer', default='identity')
     parser.add_argument('--sample_weight', action='store_true',
                         help='sample a random true weight vector, such that the value function is fully representable by the features')
     parser.add_argument('--n_mrps', type=int,
@@ -60,7 +61,7 @@ if __name__ == '__main__':
     parser.add_argument('--mode', type=str,
                         help='training mode: auto-regressive or sequential', default='auto', choices=['auto', 'sequential'])
     parser.add_argument('--seed', type=int, nargs='+',
-                        help='random seed', default=list(range(1,30)))
+                        help='random seed', default=list(range(1, 30)))
     parser.add_argument('--save_dir', type=str,
                         help='directory to save logs', default=None)
     parser.add_argument('--suffix', type=str,
@@ -82,59 +83,59 @@ if __name__ == '__main__':
         save_dir = os.path.join(save_dir, args.suffix)
 
     base_train_args = dict(
-            d=args.dim_feature,
-            s=args.num_states,
-            n=args.context_length,
-            l=args.num_layers,
-            gamma=args.gamma,
-            lmbd=args.lmbd,
-            sample_weight=args.sample_weight,
-            mode=args.mode,
-            lr=args.lr,
-            weight_decay=args.weight_decay,
-            n_mrps=args.n_mrps,
-            mini_batch_size=args.batch_size,
-            n_batch_per_mrp=args.n_batch_per_mrp,
-            log_interval=args.log_interval,
-            save_dir=save_dir,
-        )
-    if args.linear:
-        base_train_args['activation'] = 'identity'
-    else:
-        base_train_args['activation'] = 'softmax'
-
-        if args.verbose:
-            if args.linear:
-                print(
-                    f"Training a linear {args.mode} transformer of {args.num_layers} layer(s).")
-            else:
-                print(f"Training a nonlinear {args.mode} transformer of {args.num_layers} layer(s) with {args.activation} activation.")
-            print(f"Feature dimension: {args.dim_feature}")
-            print(f"Context length: {args.context_length}")
-            print(f"Number of states in the MDP: {args.num_states}")
-            print(f"Discount factor: {args.gamma}")
-            print(f"Eligibility trace decay rate: {args.lmbd}")
-            tf_v = 'representable' if args.sample_weight else 'unrepresentable'
-            print(f"Value function is {tf_v} by the features.")
-            print(f"Number of MDPs for training: {args.n_mdps}")
-            print(f'Number of mini-batches per MDP: {args.n_batch_per_mdp}')
-            print(f'Mini-batch size: {args.batch_size}')
-            print(
-                f'Total number of prompts for training: {args.n_mdps * args.n_batch_per_mdp * args.batch_size}')
-            print(f'Learning rate: {args.lr}')
-            print(f'Regularization term: {args.weight_decay}')
-            print(f'Logging interval: {args.log_interval}')
-            print(f'Save directory: {save_dir}')
-            print(f'Random seeds: {",".join(map(str, args.seed))}')
-
-    Parallel(n_jobs=-1)(
-        delayed(run_training_for_seed)(seed, base_train_args, args.linear) for seed in args.seed
+        d=args.dim_feature,
+        s=args.num_states,
+        n=args.context_length,
+        l=args.num_layers,
+        gamma=args.gamma,
+        activation=args.activation,
+        sample_weight=args.sample_weight,
+        mode=args.mode,
+        lr=args.lr,
+        weight_decay=args.weight_decay,
+        n_mrps=args.n_mrps,
+        mini_batch_size=args.batch_size,
+        n_batch_per_mrp=args.n_batch_per_mrp,
+        log_interval=args.log_interval,
+        save_dir=save_dir,
     )
+
+    if args.verbose:
+        if args.linear:
+            print(
+                f"Training a linear {args.mode} transformer of {args.num_layers} layer(s).")
+        else:
+            print(
+                f"Training a nonlinear {args.mode} transformer of {args.num_layers} layer(s) with {args.activation} activation.")
+        print(f"Feature dimension: {args.dim_feature}")
+        print(f"Context length: {args.context_length}")
+        print(f"Number of states in the MDP: {args.num_states}")
+        print(f"Discount factor: {args.gamma}")
+        tf_v = 'representable' if args.sample_weight else 'unrepresentable'
+        print(f"Value function is {tf_v} by the features.")
+        print(f"Number of MDPs for training: {args.n_mdps}")
+        print(f'Number of mini-batches per MDP: {args.n_batch_per_mdp}')
+        print(f'Mini-batch size: {args.batch_size}')
+        print(
+            f'Total number of prompts for training: {args.n_mdps * args.n_batch_per_mdp * args.batch_size}')
+        print(f'Learning rate: {args.lr}')
+        print(f'Regularization term: {args.weight_decay}')
+        print(f'Logging interval: {args.log_interval}')
+        print(f'Save directory: {save_dir}')
+        print(f'Random seeds: {",".join(map(str, args.seed))}')
+
+    is_linear = args.activation == 'identity'
+
+    # Parallel(n_jobs=-1)(
+    #     delayed(run_training_for_seed)(seed, base_train_args, is_linear) for seed in args.seed
+    # )
+    for seed in args.seed:
+        run_training_for_seed(seed, base_train_args, is_linear)
     data_dirs = []
     for seed in args.seed:
         data_dir = os.path.join(save_dir, f'seed_{seed}')
         data_dirs.append(data_dir)
-    
+
     # average across the seeds now
     average_figures_dir = os.path.join(save_dir, 'figures')
     if not os.path.exists(average_figures_dir):
@@ -144,4 +145,3 @@ if __name__ == '__main__':
     plot_attn_params(data_dirs, average_figures_dir)
     if args.linear:
         plot_weight_metrics(data_dirs, average_figures_dir)
-
