@@ -30,8 +30,6 @@ def run_training_for_seed(seed: int, train_args: Namespace, is_linear: bool):
 
 if __name__ == '__main__':
     parser = ArgumentParser()
-    # parser.add_argument('--linear', help='specify whether to train a linear or nonlinear transformer',
-    #                     action='store_true')
     parser.add_argument('-d', '--dim_feature', type=int,
                         help='feature dimension', default=4)
     parser.add_argument('-s', '--num_states', type=int,
@@ -101,23 +99,19 @@ if __name__ == '__main__':
     )
 
     if args.verbose:
-        if args.linear:
-            print(
-                f"Training a linear {args.mode} transformer of {args.num_layers} layer(s).")
-        else:
-            print(
-                f"Training a nonlinear {args.mode} transformer of {args.num_layers} layer(s) with {args.activation} activation.")
+        print(
+            f'Training {args.mode} transformer of {args.num_layers} layer(s).')
+        print(f'Activation function: {args.activation}')
         print(f"Feature dimension: {args.dim_feature}")
         print(f"Context length: {args.context_length}")
-        print(f"Number of states in the MDP: {args.num_states}")
+        print(f"Number of states in the MRP: {args.num_states}")
         print(f"Discount factor: {args.gamma}")
         tf_v = 'representable' if args.sample_weight else 'unrepresentable'
         print(f"Value function is {tf_v} by the features.")
-        print(f"Number of MDPs for training: {args.n_mdps}")
-        print(f'Number of mini-batches per MDP: {args.n_batch_per_mdp}')
+        print(f"Number of MRPs for training: {args.n_mrps}")
+        print(f'Number of mini-batches per MRP: {args.n_batch_per_mrp}')
         print(f'Mini-batch size: {args.batch_size}')
-        print(
-            f'Total number of prompts for training: {args.n_mdps * args.n_batch_per_mdp * args.batch_size}')
+        print(f'Total number of prompts for training: {args.n_mrps * args.n_batch_per_mrp * args.batch_size}')
         print(f'Learning rate: {args.lr}')
         print(f'Regularization term: {args.weight_decay}')
         print(f'Logging interval: {args.log_interval}')
