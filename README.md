@@ -15,13 +15,7 @@ With this repository,
 To install InContextTD, follow these steps:
 
 1. Clone the repository:
-    ```bash
-    git clone https://github.com/yourusername/InContextTD.git
-    ```
-2. Navigate to the project directory:
-    ```bash
-    cd InContextTD
-    ```
+2. Navigate to the project directory
 3. Install the required dependencies:
     ```bash
     python setup.py
@@ -64,7 +58,7 @@ By default, the runs will save in `./logs/YYYY-MM-DD-HH-MM-SS` format.
 
 For example, to replicate Figure 1 in the paper, run
 ```bash
-python main.py python main.py --suffix=linear_standard --l 3 --activation identity --mode auto -v
+python main.py python main.py --suffix=linear_standard --l=3 --activation=identity --mode=auto -v
 ```
 and the figures averaged across all the seeds will be saved in `./logs/YYYY-MM-DD-HH-MM-SS/linear_standard/averaged_figures`, with diagnostic figures for each seed stored in `./logs/YYYY-MM-DD-HH-MM-SS/linear_standard/seed_SEED/figures`.
 
@@ -73,8 +67,7 @@ It will yield the following plots
 ![Q Metrics Plot](figs/Q_metrics_1.pdf)
 
 
-
-To reproduce all figures in the paper, simply run the shell script
+To run all of the experiments from the paper, simply run the shell script
 ```bash
 ./run.sh
 ```
