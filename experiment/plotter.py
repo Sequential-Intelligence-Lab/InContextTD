@@ -57,12 +57,9 @@ def plot_attn_params(data_dirs: List[str],
                           log_step: int = -1) -> None:
     '''
     data_dirs: list of directories containing the data
-    save_dir: directory to save the plots not in the final paper
+    save_dir: directory to save the plots
     log_step: time step to visualize
     '''
-    attn_dir = os.path.join(save_dir, 'mean_attention_params_plots')
-    if not os.path.exists(attn_dir):
-        os.makedirs(attn_dir)
 
     Ps = []
     Qs = []
@@ -84,7 +81,7 @@ def plot_attn_params(data_dirs: List[str],
         Q = scale(Q)
         fig, axs = plt.subplots(nrows=1, ncols=2, figsize=(10, 5), sharey=True)
         cax1 = axs[0].matshow(P, vmin=-1, vmax=1)
-        if step == -1:
+        if log_step == -1:
             if hypers['mode'] == 'sequential':
                 axs[0].set_title(
                     f'Final $P_{l}$', fontsize=26)
@@ -104,7 +101,7 @@ def plot_attn_params(data_dirs: List[str],
         axs[1].tick_params(axis='both', which='both',
                            bottom=False, top=False,
                            left=False, right=False)
-        save_path = os.path.join(attn_dir, f'PQ_mean_{l}_{step}.pdf')
+        save_path = os.path.join(save_dir, f'PQ_mean_{l}_{step}.pdf')
         plt.savefig(save_path, dpi=300, format="pdf")
         plt.close(fig)
 

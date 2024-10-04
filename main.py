@@ -130,7 +130,7 @@ if __name__ == '__main__':
         data_dirs.append(data_dir)
 
     # average across the seeds now
-    average_figures_dir = os.path.join(save_dir, 'figures')
+    average_figures_dir = os.path.join(save_dir, 'averaged_figures')
     if not os.path.exists(average_figures_dir):
         os.makedirs(average_figures_dir)
 
