@@ -60,7 +60,7 @@ Below is a list of the command-line arguments available for `main.py`:
 - `--lr`: Learning rate (default: 0.001)
 - `--weight_decay`: Regularization term (default: 1e-6)
 - `--log_interval`: Frequency of logging during training (default: 10)
-- `--mode`: Training mode (choices: ['auto', 'sequential'], default: 'auto')
+- `--mode`: Training mode auto-regressive or sequential (choices: ['auto', 'sequential'], default: 'auto')
 - `--seed`: Random seeds (default: list(range(1, 30)))
 - `--save_dir`: Directory to save logs (default: None)
 - `--suffix`: Suffix to append to the log save directory (default: None)
