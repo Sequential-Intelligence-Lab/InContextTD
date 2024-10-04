@@ -161,7 +161,6 @@ def train(d: int,
                     np.stack([layer.P.detach().numpy().copy() for layer in tf.layers]))
                 log['Q'].append(
                     np.stack([layer.Q.detach().numpy().copy() for layer in tf.layers]))
-            #import pdb; pdb.set_trace()
 
     _save_log(log, save_dir)
     

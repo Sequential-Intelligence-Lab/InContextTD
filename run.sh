@@ -16,8 +16,8 @@ sleep 2
 wait
 
 ####################################################### non-linear transformer #######################################################
-python main.py --suffix=nonlinear_standard # standard
+python main.py --suffix=nonlinear_standard --activation=softmax # standard
 sleep 2
-python main.py --suffix=nonlinear_representable --sample_weight # representable value function
+python main.py --suffix=nonlinear_representable --activation=softmax --sample_weight # representable value function
 sleep 2
 wait # wait for all background jobs to finish
