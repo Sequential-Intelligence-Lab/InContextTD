@@ -29,10 +29,10 @@ python main.py --suffix=linear_standard --activation=identity --mode=auto -v
 ```
 This will generate the following plots:
 <p align="center">
-  <img src="figs/P_metrics_1-1.png" alt="P Metrics Plot" height="180"/>
-  <img src="figs/Q_metrics_1-1.png" alt="Q Metrics Plot" height="180"/>
-  <img src="figs/PQ_mean_1_4000-1.png" alt="Final Learned P and Q" height="180"/>
-  <img src="figs/cos_similarity-1.png" alt="Batch TD Comparison" height="180"/>
+  <img src="figs/P_metrics_1-1.png" alt="P Metrics Plot" height="150"/>
+  <img src="figs/Q_metrics_1-1.png" alt="Q Metrics Plot" height="150"/>
+  <img src="figs/PQ_mean_1_4000-1.png" alt="Final Learned P and Q" height="150"/>
+  <img src="figs/cos_similarity-1.png" alt="Batch TD Comparison" height="150"/>
 </p>
 The generated figures will be saved in:
 
