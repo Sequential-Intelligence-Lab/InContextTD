@@ -213,10 +213,7 @@ def plot_weight_metrics(data_dirs: str,
                         save_dir: str) -> None:
     '''
     plot the metrics for P and Q
-    xs: x-axis values
-    l: number of layers
-    P_metrics: metrics for P matrix
-    Q_metrics: metrics for Q matrix
+    data_dirs: list of directories containing the data
     save_dir: directory to save the plots
     '''
 
@@ -268,7 +265,6 @@ def plot_weight_metrics(data_dirs: str,
                     fontsize='medium').set_alpha(0.5) 
         plt.savefig(os.path.join(save_dir,
                     f'P_metrics_{i}.pdf'), dpi=300, format='pdf')
-        # save a copy in the final figures directory
         plt.close(fig)
 
 
@@ -324,8 +320,6 @@ def compute_weight_metrics(attn_params: dict,
     '''
     compute the metrics for the attention parameters
     attn_params: attention parameters from the transformer
-    P_true: hard coded true P matrix
-    Q_true: hard coded true Q matrix
     d: feature dimension
     '''
 
@@ -370,7 +364,5 @@ if __name__ == '__main__':
         './logs', 'nonlinear_discounted_train', '2024-05-10-01-06-39_standard')
     runs_to_plot = [run for run in os.listdir(
         runs_directory) if run.startswith('seed')]
-    plot_multiple_runs([os.path.join(runs_directory, run)
-                       for run in runs_to_plot], runs_directory)
     plot_attn_params([os.path.join(runs_directory, run)
                            for run in runs_to_plot], runs_directory)
