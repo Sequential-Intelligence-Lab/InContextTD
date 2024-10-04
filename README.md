@@ -36,10 +36,10 @@ If you'd like the figures to display in the README directly, you can use the fol
 
 This will generate the following plots:
 
-![P Metrics Plot](figs/P_metrics_1.png)
-![Q Metrics Plot](figs/Q_metrics_1.png)
-![Final Learned P and Q](figs/PQ_mean_1_4000.png)
-![Batch TD Comparison](figs/cos_similarity.png)
+![P Metrics Plot](figs/P_metrics_1-1.png)
+![Q Metrics Plot](figs/Q_metrics_1-1.png)
+![Final Learned P and Q](figs/PQ_mean_1_4000-1.png)
+![Batch TD Comparison](figs/cos_similarity-1.png)
 
 This way, the images will be displayed directly in the README, assuming the paths to the image files are correct and the images are present in the `figs` directory.
 
