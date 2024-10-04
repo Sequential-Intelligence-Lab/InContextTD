@@ -25,7 +25,7 @@ python setup.py
 ### Quick Start
 To quickly replicate the experiments from Figure 2 of the paper, execute the following command:
 ```bash
-python main.py --suffix=linear_standard --activation=identity --mode=auto -v
+python main.py --suffix=linear_standard -v
 ```
 This will generate the following plots:
 <p align="center">

@@ -59,7 +59,7 @@ if __name__ == '__main__':
     parser.add_argument('--mode', type=str,
                         help='training mode: auto-regressive or sequential', default='auto', choices=['auto', 'sequential'])
     parser.add_argument('--seed', type=int, nargs='+',
-                        help='random seed', default=list(range(1, 30)))
+                        help='random seed', default=list(range(1, 31)))
     parser.add_argument('--save_dir', type=str,
                         help='directory to save logs', default=None)
     parser.add_argument('--suffix', type=str,

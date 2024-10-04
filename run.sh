@@ -1,5 +1,5 @@
 ####################################################### linear transformer ####################################################### 
-python main.py --suffix=linear_standard -l=3   # standard
+python main.py --suffix=linear_standard  # standard
 
 python main.py --suffix=linear_2layers -l=2   # 2 layers auto
 
