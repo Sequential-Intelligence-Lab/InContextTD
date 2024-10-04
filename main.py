@@ -1,12 +1,12 @@
 import datetime
 import os
 from argparse import ArgumentParser, Namespace
+from joblib import Parallel, delayed
 
 from experiment.train import train
 from experiment.plotter import ( load_data,
-                                plot_attention_params, plot_error_data,
-                                plot_mean_attn_params,
-                                process_log)
+                                plot_attn_params, plot_error_data,
+                                plot_weight_metrics)
 
 if __name__ == '__main__':
     parser = ArgumentParser()
@@ -59,12 +59,10 @@ if __name__ == '__main__':
         save_dir = args.save_dir
     else:
         start_time = datetime.datetime.now()
-        sub_dir = 'linear' if args.linear else 'nonlinear'
         save_dir = os.path.join('./logs',
-                                f"{sub_dir}_train",
                                 start_time.strftime("%Y-%m-%d-%H-%M-%S"))
     if args.suffix:
-        save_dir += f'_{args.suffix}'
+        save_dir = os.path.join(save_dir, args.suffix)
 
     if args.verbose:
         if args.linear:
@@ -119,10 +117,23 @@ if __name__ == '__main__':
             train_args['activation'] = 'softmax'
             
         train(**train_args)
+        
+        # make the directory to save the figures into
+        figure_dir = os.path.join(data_dir, 'figures')
+        if not os.path.exists(figure_dir):
+            os.makedirs(figure_dir)
+        
+        plot_error_data([data_dir], figure_dir)
+        plot_attn_params([data_dir], figure_dir)
+        if args.linear:
+            plot_weight_metrics([data_dir], figure_dir) # the weight metrics are only sensible for linear transformers
+    
+    # average across the seeds now
+    average_figures_dir = os.path.join(save_dir, 'figures')
+    plot_error_data(data_dirs, average_figures_dir)
+    plot_attn_params(data_dirs, average_figures_dir)
+    if args.linear:
+        plot_weight_metrics(data_dirs, average_figures_dir)
 
-        log, hyperparams = load_data(data_dir)
-        xs, error_log, attn_params = process_log(log)
-        l_tf = args.num_layers if args.mode == 'sequential' else 1
-        plot_error_data(xs, error_log, save_dir=data_dir,final_figures_dir= data_dir,params=hyperparams)
-        plot_attention_params(xs, attn_params, save_dir=data_dir)
-    plot_mean_attn_params(data_dirs, save_dir=save_dir)
+
+

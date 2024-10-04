@@ -17,10 +17,10 @@ from MRP.mrp import MRP
 def _init_log() -> dict:
     log = {'xs': [],
            'alpha': [],
-           'mstde': [],
-           'mstde hard': [],
+           #'mstde': [],
+           #'mstde hard': [],
            'v_tf v_td msve': [],
-           'zero order cos sim': [],
+           'implicit_weight_sim': [],
            'sensitivity cos sim': [],
            'P': [],
            'Q': []}
@@ -150,8 +150,8 @@ def train(d: int,
             log['sensitivity cos sim'].append(sens_cos_sim)
 
             # Implicit Weight Similarity (IWS)
-            zo_cos_sim = implicit_weight_sim(v_tf, tf_batch_td, prompt)
-            log['zero order cos sim'].append(zo_cos_sim)
+            iws = implicit_weight_sim(v_tf, tf_batch_td, prompt)
+            log['implicit_weight_sim'].append(iws)
 
             if mode == 'auto':
                 log['P'].append([tf.attn.P.detach().numpy().copy()])
@@ -161,9 +161,10 @@ def train(d: int,
                     np.stack([layer.P.detach().numpy().copy() for layer in tf.layers]))
                 log['Q'].append(
                     np.stack([layer.Q.detach().numpy().copy() for layer in tf.layers]))
+            #import pdb; pdb.set_trace()
 
     _save_log(log, save_dir)
-
+    
     hyperparameters = {
         'd': d,
         's': s,

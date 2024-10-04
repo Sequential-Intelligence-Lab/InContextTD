@@ -2,7 +2,6 @@ import torch
 import torch.nn as nn
 import numpy as np
 from experiment.utils import stack_four
-from experiment.activation import get_activation
 
 
 class Attention(nn.Module):
@@ -198,6 +197,24 @@ class HardLinearTransformer(nn.Module):
         '''
         Z_tf = self.forward(Z)
         return -Z_tf[-1, -1]
+    
+def get_activation(activation: str) -> nn.Module:
+    if activation == 'relu':
+        return nn.ReLU()
+    elif activation == 'softmax':
+        return nn.Softmax(dim=1)
+    elif activation == 'tanh':
+        return nn.Tanh()
+    elif activation == 'leaky_relu':
+        return nn.LeakyReLU()
+    elif activation == 'elu':
+        return nn.ELU()
+    elif activation == 'selu':
+        return nn.SELU()
+    elif activation == 'identity':
+        return nn.Identity()
+    else:
+        raise ValueError(f"Invalid activation function: {activation}")
 
 
 if __name__ == '__main__':

@@ -87,42 +87,18 @@ def set_seed(seed: int):
     np.random.seed(seed)
 
 
-def get_hardcoded_P(d: int):
-    '''
-    d: feature dimension
-    '''
-    P = np.zeros((2*d+1, 2*d+1))
-    P[-1, -1] = 1
-    return P
-
-
-def get_hardcoded_Q(d: int):
-    '''
-    d: feature dimension
-    '''
-    I = np.eye(d)
-    O = np.zeros((d, d))
-    C = np.eye(d)  # just use the identity matrix as pre-conditioner
-    A = stack_four_np(-C.T, C.T, O, O)
-    Q = np.zeros((2*d+1, 2*d+1))
-    Q[:2*d, :2*d] = A
-    return Q
-
-
-def compare_P(P_tf: np.ndarray, P_true: np.ndarray, d: int):
+def compare_P(P_tf: np.ndarray, d: int):
     '''
     P_tf: P matrix from transformer
     P_true: hardcoded P matrix that implements TD
     '''
-    c = compute_scaling_factor(P_true, P_tf)
-    norm_diff = np.linalg.norm(P_true - c * P_tf)
     bottom_right = P_tf[-1, -1]
     avg_abs_all_others = 1/((2*d+1)**2 - 1) * \
         (np.sum(np.abs(P_tf)) - np.abs(P_tf[-1, -1]))
-    return norm_diff, bottom_right, avg_abs_all_others
+    return bottom_right, avg_abs_all_others
 
 
-def compare_Q(Q_tf: np.ndarray, Q_true: np.ndarray, d: int):
+def compare_Q(Q_tf: np.ndarray, d: int):
     '''
     Q_tf: Q matrix from transformer
     Q_true: hardcoded Q matrix that implements TD
@@ -134,9 +110,7 @@ def compare_Q(Q_tf: np.ndarray, Q_true: np.ndarray, d: int):
     # (we have 2d+1 x 2d+1 matrix and we are excluding the diagonal entries of the two upper dxd blocks)
     avg_abs_all_others = 1/((2*d+1)**2 - 2*d)*(np.sum(np.abs(Q_tf)) -
                                                upper_right_block_trace - upper_left_block_trace)
-    c = compute_scaling_factor(Q_true, Q_tf)
-    norm_diff = np.linalg.norm(Q_true - c * Q_tf)
-    return norm_diff, upper_left_block_trace, upper_right_block_trace, avg_abs_all_others
+    return upper_left_block_trace, upper_right_block_trace, avg_abs_all_others
 
 
 # Ensures that the hyperparameters are the same across 2 runs
