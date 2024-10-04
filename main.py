@@ -45,12 +45,12 @@ if __name__ == '__main__':
                         help='activation function for the transformer', default='softmax')
     parser.add_argument('--sample_weight', action='store_true',
                         help='sample a random true weight vector, such that the value function is fully representable by the features')
-    parser.add_argument('--n_mdps', type=int,
-                        help='total number of MDPs for training ', default=4_000)
+    parser.add_argument('--n_mrps', type=int,
+                        help='total number of MRPs for training ', default=4_000)
     parser.add_argument('--batch_size', type=int,
                         help='mini batch size', default=64)
-    parser.add_argument('--n_batch_per_mdp', type=int,
-                        help='number of mini-batches sampled from each MDP', default=5)
+    parser.add_argument('--n_batch_per_mrp', type=int,
+                        help='number of mini-batches sampled from each MRP', default=5)
     parser.add_argument('--lr', type=float,
                         help='learning rate', default=0.001)
     parser.add_argument('--weight_decay', type=float,
@@ -92,9 +92,9 @@ if __name__ == '__main__':
             mode=args.mode,
             lr=args.lr,
             weight_decay=args.weight_decay,
-            n_mdps=args.n_mdps,
+            n_mrps=args.n_mrps,
             mini_batch_size=args.batch_size,
-            n_batch_per_mdp=args.n_batch_per_mdp,
+            n_batch_per_mrp=args.n_batch_per_mrp,
             log_interval=args.log_interval,
             save_dir=save_dir,
         )

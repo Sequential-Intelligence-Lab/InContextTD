@@ -56,9 +56,9 @@ def train(d: int,
           mode: str = 'auto',
           lr: float = 0.001,
           weight_decay=1e-6,
-          n_mdps: int = 1000,
+          n_mrps: int = 1000,
           mini_batch_size: int = 64,
-          n_batch_per_mdp: int = 5,
+          n_batch_per_mrp: int = 5,
           log_interval: int = 10,
           save_dir: str = None,
           random_seed: int = 2):
@@ -77,8 +77,8 @@ def train(d: int,
     log_interval: logging interval
     save_dir: directory to save logs
     mini_batch_size: mini batch size
-    n_batch_per_mdp: number of batches per MDP
-    n_mdps: number of MDPs
+    n_batch_per_mrp: number of batches per MRP
+    n_mrps: number of MRPs
     random_seed: random seed
     '''
 
@@ -97,11 +97,11 @@ def train(d: int,
     pro_gen = MRPPromptGenerator(s, d, n, gamma)
 
     ### Training Loop ###
-    for i in tqdm(range(1, n_mdps+1)):
+    for i in tqdm(range(1, n_mrps+1)):
         pro_gen.reset_feat()  # reset feature
-        pro_gen.reset_mrp(sample_weight=sample_weight)  # reset MDP
+        pro_gen.reset_mrp(sample_weight=sample_weight)  # reset MRP
         prompt = pro_gen.get_prompt()  # get prompt object
-        for _ in range(n_batch_per_mdp):
+        for _ in range(n_batch_per_mrp):
             mstde = 0.0
             mstde_hard = 0.0
             Z_0 = prompt.reset()
@@ -129,9 +129,9 @@ def train(d: int,
 
         if i % log_interval == 0:
             prompt.reset()  # reset prompt for fair testing
-            mdp: MRP = prompt.mdp
+            mrp: MRP = prompt.mrp
             phi: np.ndarray = prompt.get_feature_mat().numpy()
-            steady_d: np.ndarray = mdp.steady_d
+            steady_d: np.ndarray = mrp.steady_d
 
             v_tf: np.ndarray = tf.fit_value_func(
                 prompt.context(), torch.from_numpy(phi)).detach().numpy()
@@ -173,9 +173,9 @@ def train(d: int,
         'lmbd': lmbd,
         'gamma': gamma,
         'sample_weight': sample_weight,
-        'n_mdps': n_mdps,
+        'n_mrps': n_mrps,
         'mini_batch_size': mini_batch_size,
-        'n_batch_per_mdp': n_batch_per_mdp,
+        'n_batch_per_mrp': n_batch_per_mrp,
         'lr': lr,
         'weight_decay': weight_decay,
         'log_interval': log_interval,
