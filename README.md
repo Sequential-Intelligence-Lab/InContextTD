@@ -35,7 +35,9 @@ This will generate the following plots:
   <img src="figs/cos_similarity-1.png" alt="Batch TD Comparison" width="250"/>
 </p>
 The generated figures will be saved in:
+
 - `./logs/YYYY-MM-DD-HH-MM-SS/linear_standard/averaged_figures/` (aggregated results across all seeds)
+
 - `./logs/YYYY-MM-DD-HH-MM-SS/linear_standard/seed_SEED/figures/` (diagnostic figures for each individual seed)
 
 ### Custom Experiment Settings
