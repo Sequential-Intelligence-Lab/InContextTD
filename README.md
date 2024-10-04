@@ -4,7 +4,7 @@ Welcome to the InContextTD repository, which accompanies the paper: [Transformer
 
 ## Table of Contents
 - [Introduction](#introduction)
-- [Installation](#installation)
+- [Dependencies](#dependencies)
 - [Usage](#usage)
   - [Quick Start](#quick-start)
   - [Custom Experiments](#custom-experiment-settings)
@@ -14,7 +14,7 @@ Welcome to the InContextTD repository, which accompanies the paper: [Transformer
 ## Introduction
 This repository provides the code to empirically demonstrate how transformers can learn to implement temporal difference (TD) methods for in-context policy evaluation. The experiments explore transformers' ability to apply TD learning during inference without requiring parameter updates.
 
-## Installation
+## Dependencies
 To install the required dependencies, first clone this repository, then run the following command:
 ```bash
 python setup.py
@@ -27,21 +27,16 @@ To quickly replicate the experiments from Figure 2 of the paper, execute the fol
 ```bash
 python main.py --suffix=linear_standard --activation=identity --mode=auto -v
 ```
-
+This will generate the following plots:
+<p align="center">
+  <img src="figs/P_metrics_1-1.png" alt="P Metrics Plot" width="200"/>
+  <img src="figs/Q_metrics_1-1.png" alt="Q Metrics Plot" width="200"/>
+  <img src="figs/PQ_mean_1_4000-1.png" alt="Final Learned P and Q" width="325"/>
+  <img src="figs/cos_similarity-1.png" alt="Batch TD Comparison" width="250"/>
+</p>
 The generated figures will be saved in:
 - `./logs/YYYY-MM-DD-HH-MM-SS/linear_standard/averaged_figures/` (aggregated results across all seeds)
 - `./logs/YYYY-MM-DD-HH-MM-SS/linear_standard/seed_SEED/figures/` (diagnostic figures for each individual seed)
-
-If you'd like the figures to display in the README directly, you can use the following markdown syntax to embed the images:
-
-This will generate the following plots:
-
-![P Metrics Plot](figs/P_metrics_1-1.png)
-![Q Metrics Plot](figs/Q_metrics_1-1.png)
-![Final Learned P and Q](figs/PQ_mean_1_4000-1.png)
-![Batch TD Comparison](figs/cos_similarity-1.png)
-
-This way, the images will be displayed directly in the README, assuming the paths to the image files are correct and the images are present in the `figs` directory.
 
 ### Custom Experiment Settings
 To run experiments with custom configurations, use:
