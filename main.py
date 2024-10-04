@@ -8,6 +8,23 @@ from experiment.plotter import ( load_data,
                                 plot_attn_params, plot_error_data,
                                 plot_weight_metrics)
 
+def run_training_for_seed(seed: int, train_args: Namespace, is_linear: bool):
+    data_dir = os.path.join(train_args['save_dir'], f'seed_{seed}')
+    train_args['save_dir'] = data_dir
+    train_args['random_seed'] = seed
+
+    train(**train_args)
+
+    # make the directory to save the figures into
+    figure_dir = os.path.join(data_dir, 'figures')
+    if not os.path.exists(figure_dir):
+        os.makedirs(figure_dir)
+
+    plot_error_data([data_dir], figure_dir)
+    plot_attn_params([data_dir], figure_dir)
+    if is_linear:
+        plot_weight_metrics([data_dir], figure_dir)  # the weight metrics are only sensible for linear transformers
+
 if __name__ == '__main__':
     parser = ArgumentParser()
     parser.add_argument('--linear', help='specify whether to train a linear or nonlinear transformer',
@@ -64,36 +81,7 @@ if __name__ == '__main__':
     if args.suffix:
         save_dir = os.path.join(save_dir, args.suffix)
 
-    if args.verbose:
-        if args.linear:
-            print(
-                f"Training a linear {args.mode} transformer of {args.num_layers} layer(s).")
-        else:
-            print(
-                f"Training a nonlinear {args.mode} transformer of {args.num_layers} layer(s) with {args.activation} activation.")
-        print(f"Feature dimension: {args.dim_feature}")
-        print(f"Context length: {args.context_length}")
-        print(f"Number of states in the MDP: {args.num_states}")
-        print(f"Discount factor: {args.gamma}")
-        print(f"Eligibility trace decay rate: {args.lmbd}")
-        tf_v = 'representable' if args.sample_weight else 'unrepresentable'
-        print(f"Value function is {tf_v} by the features.")
-        print(f"Number of MDPs for training: {args.n_mdps}")
-        print(f'Number of mini-batches per MDP: {args.n_batch_per_mdp}')
-        print(f'Mini-batch size: {args.batch_size}')
-        print(
-            f'Total number of prompts for training: {args.n_mdps * args.n_batch_per_mdp * args.batch_size}')
-        print(f'Learning rate: {args.lr}')
-        print(f'Regularization term: {args.weight_decay}')
-        print(f'Logging interval: {args.log_interval}')
-        print(f'Save directory: {save_dir}')
-        print(f'Random seeds: {",".join(map(str, args.seed))}')
-
-    data_dirs = []
-    for seed in args.seed:
-        data_dir = os.path.join(save_dir, f'seed_{seed}')
-        data_dirs.append(data_dir)
-        train_args = dict(
+    base_train_args = dict(
             d=args.dim_feature,
             s=args.num_states,
             n=args.context_length,
@@ -108,25 +96,44 @@ if __name__ == '__main__':
             mini_batch_size=args.batch_size,
             n_batch_per_mdp=args.n_batch_per_mdp,
             log_interval=args.log_interval,
-            save_dir=data_dir,
-            random_seed=seed
+            save_dir=save_dir,
         )
-        if args.linear:
-            train_args['activation'] = 'identity'
-        else:
-            train_args['activation'] = 'softmax'
-            
-        train(**train_args)
-        
-        # make the directory to save the figures into
-        figure_dir = os.path.join(data_dir, 'figures')
-        if not os.path.exists(figure_dir):
-            os.makedirs(figure_dir)
-        
-        plot_error_data([data_dir], figure_dir)
-        plot_attn_params([data_dir], figure_dir)
-        if args.linear:
-            plot_weight_metrics([data_dir], figure_dir) # the weight metrics are only sensible for linear transformers
+    if args.linear:
+        base_train_args['activation'] = 'identity'
+    else:
+        base_train_args['activation'] = 'softmax'
+
+        if args.verbose:
+            if args.linear:
+                print(
+                    f"Training a linear {args.mode} transformer of {args.num_layers} layer(s).")
+            else:
+                print(f"Training a nonlinear {args.mode} transformer of {args.num_layers} layer(s) with {args.activation} activation.")
+            print(f"Feature dimension: {args.dim_feature}")
+            print(f"Context length: {args.context_length}")
+            print(f"Number of states in the MDP: {args.num_states}")
+            print(f"Discount factor: {args.gamma}")
+            print(f"Eligibility trace decay rate: {args.lmbd}")
+            tf_v = 'representable' if args.sample_weight else 'unrepresentable'
+            print(f"Value function is {tf_v} by the features.")
+            print(f"Number of MDPs for training: {args.n_mdps}")
+            print(f'Number of mini-batches per MDP: {args.n_batch_per_mdp}')
+            print(f'Mini-batch size: {args.batch_size}')
+            print(
+                f'Total number of prompts for training: {args.n_mdps * args.n_batch_per_mdp * args.batch_size}')
+            print(f'Learning rate: {args.lr}')
+            print(f'Regularization term: {args.weight_decay}')
+            print(f'Logging interval: {args.log_interval}')
+            print(f'Save directory: {save_dir}')
+            print(f'Random seeds: {",".join(map(str, args.seed))}')
+
+    Parallel(n_jobs=-1)(
+        delayed(run_training_for_seed)(seed, base_train_args, args.linear) for seed in args.seed
+    )
+    data_dirs = []
+    for seed in args.seed:
+        data_dir = os.path.join(save_dir, f'seed_{seed}')
+        data_dirs.append(data_dir)
     
     # average across the seeds now
     average_figures_dir = os.path.join(save_dir, 'figures')
@@ -134,6 +141,4 @@ if __name__ == '__main__':
     plot_attn_params(data_dirs, average_figures_dir)
     if args.linear:
         plot_weight_metrics(data_dirs, average_figures_dir)
-
-
 

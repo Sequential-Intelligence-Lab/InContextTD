@@ -99,7 +99,7 @@ def train(d: int,
     ### Training Loop ###
     for i in tqdm(range(1, n_mdps+1)):
         pro_gen.reset_feat()  # reset feature
-        pro_gen.reset_mdp(sample_weight=sample_weight)  # reset MDP
+        pro_gen.reset_mrp(sample_weight=sample_weight)  # reset MDP
         prompt = pro_gen.get_prompt()  # get prompt object
         for _ in range(n_batch_per_mdp):
             mstde = 0.0
