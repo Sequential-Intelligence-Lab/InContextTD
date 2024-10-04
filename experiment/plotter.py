@@ -82,7 +82,7 @@ def plot_attn_params(data_dirs: List[str],
         Q = scale(Q)
         fig, axs = plt.subplots(nrows=1, ncols=2, figsize=(10, 5), sharey=True)
         cax1 = axs[0].matshow(P, vmin=-1, vmax=1)
-        if step == -1:
+        if log_step == -1:
             if hypers['mode'] == 'sequential':
                 axs[0].set_title(
                     f'Final $P_{l}$', fontsize=26)
