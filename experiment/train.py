@@ -9,9 +9,9 @@ from tqdm import tqdm
 
 from experiment.model import HardLinearTransformer, Transformer
 from experiment.prompt import MRPPromptGenerator
-from experiment.utils import (compare_sensitivity, compute_msve, set_seed,
-                               implicit_weight_sim)
 from MRP.mrp import MRP
+from utils import (compare_sensitivity, compute_msve, implicit_weight_sim,
+                   set_seed)
 
 
 def _init_log() -> dict:

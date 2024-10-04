@@ -7,8 +7,8 @@ import torch
 from tqdm import tqdm
 
 from experiment.prompt import Feature, MRPPrompt
-from experiment.utils import compute_msve, set_seed
 from MRP.loop import Loop
+from utils import compute_msve, set_seed
 
 if __name__ == '__main__':
     os.makedirs(os.path.join('logs', 'demo'), exist_ok=True)

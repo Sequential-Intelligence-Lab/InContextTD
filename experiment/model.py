@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
-import numpy as np
-from experiment.utils import stack_four
+
+from utils import stack_four
 
 
 class Attention(nn.Module):

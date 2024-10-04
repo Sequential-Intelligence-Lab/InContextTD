@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 
-from experiment.utils import stack_four
+from utils import stack_four
 
 # TD layer
 

@@ -2,8 +2,8 @@ from typing import Tuple
 
 import numpy as np
 
-from experiment.utils import compute_steady_dist
 from MRP.mrp import MRP
+from utils import compute_steady_dist
 
 
 class Loop(MRP):
@@ -12,7 +12,7 @@ class Loop(MRP):
                  gamma: float = 0.9,
                  threshold: float = 0.5,
                  weight: np.ndarray = None,
-                 Phi: np.ndarray = None) -> None:
+                 phi: np.ndarray = None) -> None:
         '''
         n_states: number of states of the Loop MRP
         gamma: discount factor
@@ -40,9 +40,9 @@ class Loop(MRP):
         self.mu /= self.mu.sum()
 
         if weight is not None:
-            assert Phi is not None, 'feature matrix must be provided if weight is given'
+            assert phi is not None, 'feature matrix must be provided if weight is given'
             self.w = weight
-            self.v = Phi.dot(self.w)
+            self.v = phi.dot(self.w)
             self.r = (np.eye(n_states) - gamma * self.P).dot(self.v)
         else:
             self.r = np.random.uniform(low=-1.0, high=1.0, size=(n_states, 1))

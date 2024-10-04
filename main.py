@@ -1,12 +1,12 @@
 import datetime
 import os
 from argparse import ArgumentParser, Namespace
+
 from joblib import Parallel, delayed
 
-from experiment.train import train
-from experiment.plotter import (load_data,
-                                plot_attn_params, plot_error_data,
+from experiment.plotter import (plot_attn_params, plot_error_data,
                                 plot_weight_metrics)
+from experiment.train import train
 
 
 def run_training_for_seed(seed: int, train_args: Namespace, is_linear: bool):
@@ -120,11 +120,10 @@ if __name__ == '__main__':
 
     is_linear = args.activation == 'identity'
 
-    # Parallel(n_jobs=-1)(
-    #     delayed(run_training_for_seed)(seed, base_train_args, is_linear) for seed in args.seed
-    # )
-    for seed in args.seed:
-        run_training_for_seed(seed, base_train_args, is_linear)
+    Parallel(n_jobs=-1)(
+        delayed(run_training_for_seed)(seed, base_train_args, is_linear) for seed in args.seed
+    )
+
     data_dirs = []
     for seed in args.seed:
         data_dir = os.path.join(save_dir, f'seed_{seed}')
@@ -137,5 +136,5 @@ if __name__ == '__main__':
 
     plot_error_data(data_dirs, average_figures_dir)
     plot_attn_params(data_dirs, average_figures_dir)
-    if args.linear:
+    if is_linear:
         plot_weight_metrics(data_dirs, average_figures_dir)
