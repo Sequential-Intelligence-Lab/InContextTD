@@ -1,73 +1,74 @@
 # InContextTD
 
-Welcome to the InContextTD repository, which is the repo for the paper [Transformers Learn Temporal Difference Methods for in Context Reinforcement Learning](https://arxiv.org/abs/2405.13861)
+Welcome to the InContextTD repository, which accompanies the paper: [Transformers Learn Temporal Difference Methods for In-Context Reinforcement Learning](https://arxiv.org/abs/2405.13861).
 
 ## Table of Contents
 - [Introduction](#introduction)
 - [Installation](#installation)
 - [Usage](#usage)
+  - [Quick Start](#quick-start)
+  - [Custom Experiments](#custom-experiment-settings)
+  - [Complete Replication](#complete-replication)
 - [License](#license)
 
 ## Introduction
-With this repository, 
+This repository provides the code to empirically demonstrate how transformers can learn to implement temporal difference (TD) methods for in-context policy evaluation. The experiments explore transformers' ability to apply TD learning during inference without requiring parameter updates.
 
 ## Installation
-To install InContextTD, follow these steps:
-
-1. Clone the repository:
-2. Navigate to the project directory
-3. Install the required dependencies:
-    ```bash
-    python setup.py
-    ```
+To install the required dependencies, first clone this repository, then run the following command:
+```bash
+python setup.py
+```
 
 ## Usage
-To start using InContextTD, run the following command:
 
-To run a single experiment run
+### Quick Start
+To quickly replicate the experiments from Figure 2 of the paper, execute the following command:
+```bash
+python main.py --suffix=linear_standard --activation=identity --mode=auto -v
+```
 
+The generated figures will be saved in:
+- `./logs/YYYY-MM-DD-HH-MM-SS/linear_standard/averaged_figures/` (aggregated results across all seeds)
+- `./logs/YYYY-MM-DD-HH-MM-SS/linear_standard/seed_SEED/figures/` (diagnostic figures for each individual seed)
+
+This will generate the following plots:
+- P Metrics Plot: `figs/P_metrics_1.pdf`
+- Q Metrics Plot: `figs/Q_metrics_1.pdf`
+- Final Learned P and Q: `figs/PQ_mean_1_4000.pdf`
+- Batch TD Comparison: `figs/cos_similarity.pdf`
+
+### Custom Experiment Settings
+To run experiments with custom configurations, use:
 ```bash
 python main.py [options]
 ```
+Below is a list of the command-line arguments available for `main.py`:
 
-Here is the complete list command line arguments you can use with `main.py`:
+- `-d`, `--dim_feature`: Feature dimension (default: 4)
+- `-s`, `--num_states`: Number of states (default: 10)
+- `-n`, `--context_length`: Context length (default: 30)
+- `-l`, `--num_layers`: Number of transformer layers (default: 3)
+- `--gamma`: Discount factor (default: 0.9)
+- `--activation`: Activation function (choices: ['identity', 'softmax', 'relu'])
+- `--sample_weight`: Flag to randomly sample a true weight vector that allows the value function to be fully represented by the features
+- `--n_mrps`: Number of MRPs used for training (default: 4000)
+- `--batch_size`: Mini-batch size (default: 64)
+- `--n_batch_per_mrp`: Number of mini-batches sampled per MRP (default: 5)
+- `--lr`: Learning rate (default: 0.001)
+- `--weight_decay`: Regularization term (default: 1e-6)
+- `--log_interval`: Frequency of logging during training (default: 10)
+- `--mode`: Training mode (choices: ['auto', 'sequential'], default: 'auto')
+- `--seed`: Random seeds (default: list(range(1, 30)))
+- `--save_dir`: Directory to save logs (default: None)
+- `--suffix`: Suffix to append to the log save directory (default: None)
+- `--gen_gif`: Flag to generate a GIF showing the evolution of weights
+- `-v`, `--verbose`: Flag to print detailed training progress
 
-- `--linear`: Specify whether to train a linear or nonlinear transformer (flag).
-- `-d`, `--dim_feature`: Feature dimension (default: 4).
-- `-s`, `--num_states`: Number of states (default: 10).
-- `-n`, `--context_length`: Context length (default: 30).
-- `-l`, `--num_layers`: Number of layers (default: 3).
-- `--gamma`: Discount factor (default: 0.9).
-- `--lmbd`: Eligibility trace decay rate (default: 0.0).
-- `--activation`: Activation function for the transformer (choices: ['softmax','relu','identity']).
-- `--sample_weight`: Sample a random true weight vector, such that the value function is fully representable by the features (flag).
-- `--n_mrps`: Total number of MRPs for training (default: 4,000).
-- `--batch_size`: Mini batch size (default: 64).
-- `--n_batch_per_mrp`: Number of mini-batches sampled from each MRP (default: 5).
-- `--lr`: Learning rate (default: 0.001).
-- `--weight_decay`: Regularization term (default: 1e-6).
-- `--log_interval`: Logging interval (default: 10).
-- `--mode`: Training mode: auto-regressive or sequential (default: 'auto', choices: ['auto', 'sequential']).
-- `--seed`: Random seed (default: list(range(1,30))).
-- `--save_dir`: Directory to save logs (default: None).
-- `--suffix`: Suffix to add to the save directory (default: None).
-- `--gen_gif`: Generate a GIF for the evolution of weights (flag).
-- `-v`, `--verbose`: Print training details (flag).
+If no `--save_dir` is specified, logs will be saved in `./logs/YYYY-MM-DD-HH-MM-SS`. If a `--suffix` is provided, logs will be saved in `./logs/YYYY-MM-DD-HH-MM-SS/SUFFIX`.
 
-By default, the runs will save in `./logs/YYYY-MM-DD-HH-MM-SS` format.
-
-For example, to replicate Figure 1 in the paper, run
-```bash
-python main.py python main.py --suffix=linear_standard --l=3 --activation=identity --mode=auto -v
-```
-and the figures averaged across all the seeds will be saved in `./logs/YYYY-MM-DD-HH-MM-SS/linear_standard/averaged_figures`, with diagnostic figures for each seed stored in `./logs/YYYY-MM-DD-HH-MM-SS/linear_standard/seed_SEED/figures`.
-
-It will yield the following plots
-![P Metrics Plot](figs/P_metrics_1.pdf)
-![Q Metrics Plot](figs/Q_metrics_1.pdf)
-
-
-To run all of the experiments from the paper, simply run the shell script
+### Complete Replication
+To run all the experiments from the paper in one go, execute the following shell script:
 ```bash
 ./run.sh
 ```
