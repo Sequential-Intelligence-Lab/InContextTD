@@ -15,9 +15,9 @@ Welcome to the InContextTD repository, which accompanies the paper: [Transformer
 This repository provides the code to empirically demonstrate how transformers can learn to implement temporal difference (TD) methods for in-context policy evaluation. The experiments explore transformers' ability to apply TD learning during inference without requiring parameter updates.
 
 ## Dependencies
-To install the required dependencies, first clone this repository, then run the following command:
+To install the required dependencies, first clone this repository, then run the following command on the root directory of the project:
 ```bash
-python setup.py
+pip install .
 ```
 
 ## Usage
