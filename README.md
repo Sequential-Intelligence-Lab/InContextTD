@@ -73,6 +73,9 @@ If no `--save_dir` is specified, logs will be saved in `./logs/YYYY-MM-DD-HH-MM-
 We have a demo script to demonstrate the performance of the TD algorithm implemented by the linear transformer under our theoretical construction.
 The script generates a figure of the mean square value error (MSVE) averaged over the number of randomly generated MRPs against a sequence of increasing context lengths.
 Note that we employ fully representable value functions here to make sure the minimum MSVE is zero.
+<p align="center">
+  <img src="figs/msve_vs_context_length.png" alt="Demo" height="150"/>
+</p>
 
 To run the script, use
 ```bash
@@ -99,6 +102,8 @@ To run all the experiments from the paper in one go, execute the following shell
 ```bash
 ./run.sh
 ```
+### Theory Verification
+
 
 ## License
 This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for more information.
