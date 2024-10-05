@@ -1,4 +1,5 @@
 import os
+from argparse import ArgumentParser, Namespace
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -11,18 +12,53 @@ from MRP.loop import Loop
 from utils import compute_msve, set_seed
 
 if __name__ == '__main__':
-    os.makedirs(os.path.join('logs', 'demo'), exist_ok=True)
+    parser = ArgumentParser()
+    parser.add_argument('-d', '--dim_feature', type=int,
+                        help='feature dimension', default=5)
+    parser.add_argument('-l', '--num_layers', type=int,
+                        help='number of transformer layers', default=15)
+    parser.add_argument('-smin', '--min_state_num', type=int,
+                        help='minimum possible number of states', default=5)
+    parser.add_argument('-smax', '--max_state_num', type=int,
+                        help='maximum possible number of states', default=15)
+    parser.add_argument('--gamma', type=float,
+                        help='discount factor', default=0.9)
+    parser.add_argument('--lr', type=float,
+                        help='TD learning rate', default=0.2)
+    parser.add_argument('--n_mrps', type=int,
+                        help='total number of MRPs to run', default=300)
+    parser.add_argument('-nmin', '--min_ctxt_len', type=int,
+                        help='minimum context length', default=1)
+    parser.add_argument('-nmax', '--max_ctxt_len', type=int,
+                        help='maximum context length', default=40)
+    parser.add_argument('--ctxt_step', type=int,
+                        help='context length step', default=2)
+    parser.add_argument('--seed', type=int,
+                        help='random seed', default=42)
+    parser.add_argument('--save_dir', type=str,
+                        help='directory to save demo result', default=None)
 
-    set_seed(42)
+    args: Namespace = parser.parse_args()
 
-    d = 5
-    l = 15
-    min_s = 5
-    max_s = 15
-    gamma = 0.9
-    n_mrps = 300
-    alpha = 0.2
-    context_lengths = list(range(1, 41, 2))
+    if args.save_dir is not None:
+        save_path = os.path.join(args.save_dir, 'demo')
+    else:
+        save_path = os.path.join('logs', 'demo')
+
+    os.makedirs(save_path, exist_ok=True)
+
+    set_seed(args.seed)
+
+    d = args.dim_feature
+    l = args.num_layers
+    min_s = args.min_state_num
+    max_s = args.max_state_num
+    gamma = args.gamma
+    n_mrps = args.n_mrps
+    alpha = args.lr
+    context_lengths = list(range(args.min_ctxt_len,
+                                 args.max_ctxt_len+1,
+                                 args.ctxt_step))
 
     all_msves = []  # (n_mrps, len(context_lengths))
     for _ in tqdm(range(n_mrps)):
@@ -38,8 +74,8 @@ if __name__ == '__main__':
             w = torch.zeros((d, 1))
             for _ in range(l):
                 w, _ = prompt.td_update(w, lr=alpha)
-            msve_n.append(compute_msve(feature.phi @ w.numpy(), 
-                                       mrp.v, 
+            msve_n.append(compute_msve(feature.phi @ w.numpy(),
+                                       mrp.v,
                                        mrp.steady_d))
         all_msves.append(msve_n)
 
@@ -58,6 +94,6 @@ if __name__ == '__main__':
     plt.xlabel('Context Length (t)')
     plt.ylabel('MSVE', rotation=0, labelpad=30)
     plt.grid(True)
-    fig_path = os.path.join('logs', 'demo', 'msve_vs_context_length.pdf')
+    fig_path = os.path.join(save_path, 'msve_vs_context_length.pdf')
     plt.savefig(fig_path, dpi=300, format='pdf')
     plt.close(fig)
