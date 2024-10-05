@@ -12,36 +12,8 @@ def stack_four(A: torch.Tensor, B: torch.Tensor,
     return torch.cat([top, bottom], dim=0)
 
 
-def stack_four_np(A: np.ndarray, B: np.ndarray,
-                  C: np.ndarray, D: np.ndarray):
-    top = np.concatenate([A, B], axis=1)
-    bottom = np.concatenate([C, D], axis=1)
-    return np.concatenate([top, bottom], axis=0)
-
-
 def scale(matrix: np.ndarray):
     return matrix / np.max(np.abs(matrix))
-
-
-def analytical_weight_update(w_tf: torch.Tensor,
-                             Z: torch.Tensor,
-                             d: int,
-                             n: int,
-                             C: torch.Tensor = None):
-    '''
-    w_tf: current transformer weight
-    Z: context matrix
-    d: feature dimension
-    n: context length
-    C: preconditioning matrix
-    '''
-    Phi = Z[:d, :n]
-    Y = Z[-1, :n].reshape(n, 1)
-    prod = Phi @ Y
-    if C:
-        prod = C @ prod
-
-    return w_tf + 1/n * prod
 
 
 def compute_steady_dist(P: np.array) -> np.ndarray:
@@ -120,31 +92,6 @@ def check_params(params, params_0):
             raise ValueError(f'Parameter {key} is not the same across runs.')
 
 
-def compute_scaling_factor(M1: np.ndarray, M2: np.ndarray) -> float:
-    '''
-    M1 approximately C*M2
-    '''
-    m1 = M1.flatten()
-    m2 = M2.flatten()
-    return m1.dot(m2) / m2.dot(m2)
-
-
-def in_context_learning_rate(P: np.ndarray,
-                             Q: np.ndarray,
-                             d: int) -> float:
-    c_P = P[-1, -1]
-
-    diag_true = np.ones(2 * d)
-    diag_true[:d] = -1
-    diag_Q_first = np.array([Q[i, i] for i in range(d)])
-    diag_Q_second = np.array([Q[i, i+d] for i in range(d)])
-    diag_Q = np.concatenate((diag_Q_first, diag_Q_second))
-    c_Q = compute_scaling_factor(diag_Q, diag_true)
-
-    rate = c_P * c_Q
-    return rate
-
-
 def cos_sim(v1: Union[torch.Tensor, np.ndarray],
             v2: Union[torch.Tensor, np.ndarray]) -> float:
     '''
@@ -193,8 +140,8 @@ def compare_sensitivity(tf,
 
 
 def implicit_weight_sim(v_tf: np.ndarray,
-                          tf_hard,
-                          prompt):
+                        tf_hard,
+                        prompt):
     '''
     computes the cosine similarity and l2 distance
     between the batch TD weight (with the fitted learning rate) 
