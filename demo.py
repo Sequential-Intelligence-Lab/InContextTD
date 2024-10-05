@@ -30,7 +30,7 @@ if __name__ == '__main__':
         thd = np.random.uniform(low=0.1, high=0.9)
         feature = Feature(d, s)  # new feature
         true_w = np.random.randn(d, 1)  # sample true weight
-        mrp = Loop(s, gamma, threshold=thd, weight=true_w, Phi=feature.phi)
+        mrp = Loop(s, gamma, threshold=thd, weight=true_w, phi=feature.phi)
         msve_n = []
         for n in context_lengths:
             prompt = MRPPrompt(d, n, gamma, mrp, feature)
