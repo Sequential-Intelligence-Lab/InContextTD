@@ -69,14 +69,3 @@ class BoyanChain(MRP):
         if hasattr(self, 'w'):
             bc.w = self.w.copy()
         return bc
-
-
-if __name__ == '__main__':
-    w = np.random.randn(2, 1)
-    bc = BoyanChain(n_states=5, weight=w, X=np.random.randn(5, 2))
-    print('stochastic matrix\n', bc.P)
-    print('weight\n', bc.w)
-    print('reward\n', bc.r)
-    print('value\n', bc.v)
-    print('stationary distribution\n', bc.steady_d)
-    print('initial distribution\n', bc.mu)
