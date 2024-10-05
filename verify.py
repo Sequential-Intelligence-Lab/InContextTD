@@ -1,14 +1,16 @@
 import os
+from argparse import ArgumentParser, Namespace
 
 import numpy as np
 import torch
 from tqdm import tqdm
 
-from verification.model import (AVGREWTDTransformer,
-                                       DiscountedTDTransformer, RGTransformer)
+from verification.model import (AVGREWTDTransformer, DiscountedTDTransformer,
+                                RGTransformer)
 from verification.prompt import Prompt
 
 torch.set_default_dtype(torch.float64)
+
 
 def verify_one_trial(d: int, n: int, l: int) -> np.ndarray:
     '''
@@ -61,12 +63,14 @@ def verify_one_trial(d: int, n: int, l: int) -> np.ndarray:
                 rg=np.absolute(rg_tf_value - rg_value),
                 avg_rew_td=np.absolute(avg_rew_td_tf_value - avg_rew_rd_value))
 
-def verify(d: int, n: int, l: int, num_trials: int = 30):
+
+def verify(d: int, n: int, l: int, num_trials: int, save_dir: str):
     '''
     d: feature dimension
     n: context length
     l: number of layers (updates)
     num_trials: number of trials
+    save_dir: directory to save verification result
     '''
     td0_error = []
     tdlmbd_error = []
@@ -84,17 +88,39 @@ def verify(d: int, n: int, l: int, num_trials: int = 30):
     rg_error = np.array(rg_error)
     avg_rew_td_error = np.array(avg_rew_td_error)
 
-    log_path = os.path.join('logs', 'theory')
-    os.makedirs(log_path, exist_ok=True)
-    np.save(os.path.join(log_path, 'discounted_td.npy'), td0_error)
-    np.save(os.path.join(log_path, 'discounted_td_lambda.npy'), tdlmbd_error)
-    np.save(os.path.join(log_path, 'residual_gradient.npy'), rg_error)
-    np.save(os.path.join(log_path, 'avg_reward_td.npy'), avg_rew_td_error)
+    np.save(os.path.join(save_dir, 'discounted_td.npy'), td0_error)
+    np.save(os.path.join(save_dir, 'discounted_td_lambda.npy'), tdlmbd_error)
+    np.save(os.path.join(save_dir, 'residual_gradient.npy'), rg_error)
+    np.save(os.path.join(save_dir, 'avg_reward_td.npy'), avg_rew_td_error)
 
 
 if __name__ == '__main__':
     from verification.plot import plot_error
-    torch.manual_seed(42)
-    np.random.seed(42)
-    verify(3, 100, 40, 30)
-    plot_error()
+    from utils import set_seed
+
+    parser = ArgumentParser()
+    parser.add_argument('-d', '--dim_feature', type=int,
+                        help='feature dimension', default=3)
+    parser.add_argument('-n', '--context_length', type=int,
+                        help='context length', default=100)
+    parser.add_argument('-l', '--num_layers', type=int,
+                        help='number of transformer layers', default=40)
+    parser.add_argument('--num_trials', type=int,
+                        help='number of trials', default=30)
+    parser.add_argument('--seed', type=int,
+                        help='random seed', default=42)
+    parser.add_argument('--save_dir', type=str,
+                        help='directory to save verification result', default='logs')
+    args: Namespace = parser.parse_args()
+
+    set_seed(args.seed)
+
+    save_dir = os.path.join(args.save_dir, 'theory')
+    os.makedirs(save_dir, exist_ok=True)
+
+    verify(args.dim_feature,
+           args.context_length,
+           args.num_layers,
+           args.num_trials,
+           save_dir)
+    plot_error(save_dir)
