@@ -103,7 +103,24 @@ To run all the experiments from the paper in one go, execute the following shell
 ./run.sh
 ```
 ### Theory Verification
+We provide a script to numerically verify our theories.
+The script computes the absolute errors in log scale between the value predictions by the linear transformers and the direct implementations of their corresponding in-context algorithms.
+<p align="center">
+  <img src="figs/log_error.png" alt="Theory Verification" height="150"/>
+</p>
 
+To run the script, use
+```bash
+python verify.py [options]
+```
+Below is a list of the command-line arguments available for `verify.py`:
+- `-d`, `--dim_feature`: Feature dimension (default: 3)
+- `-n`, `--context_length`: Context length (default: 100)
+- `-l`, `--num_layers`: Number of transformer layers/TD updates (default: 40)
+- `--num_trials`: Number of trials to run (default: 30)
+- `--seed`: Random seed (default: 42)
+- `--save_dir`: Directory to save theory verification results (default: 'logs')
 
+By default, the result is saved to `./logs/theory`.
 ## License
 This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for more information.
