@@ -64,7 +64,7 @@ Below is a list of the command-line arguments available for `main.py`:
 - `--seed`: Random seeds (default: list(range(1, 30)))
 - `--save_dir`: Directory to save logs (default: None)
 - `--suffix`: Suffix to append to the log save directory (default: None)
-- `--gen_gif`: Flag to generate a GIF showing the evolution of weights
+- `--gen_gif`: Flag to generate a GIF showing the evolution of weights (under construction)
 - `-v`, `--verbose`: Flag to print detailed training progress
 
 If no `--save_dir` is specified, logs will be saved in `./logs/YYYY-MM-DD-HH-MM-SS`. If a `--suffix` is provided, logs will be saved in `./logs/YYYY-MM-DD-HH-MM-SS/SUFFIX`.
