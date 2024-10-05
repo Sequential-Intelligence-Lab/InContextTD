@@ -61,7 +61,7 @@ Below is a list of the command-line arguments available for `main.py`:
 - `--weight_decay`: Regularization term (default: 1e-6)
 - `--log_interval`: Frequency of logging during training (default: 10)
 - `--mode`: Training mode auto-regressive or sequential (choices: ['auto', 'sequential'], default: 'auto')
-- `--seed`: Random seeds (default: list(range(1, 30)))
+- `--seed`: Random seeds (default: list(range(1, 31)))
 - `--save_dir`: Directory to save logs (default: None)
 - `--suffix`: Suffix to append to the log save directory (default: None)
 - `--gen_gif`: Flag to generate a GIF showing the evolution of weights (under construction)
@@ -69,6 +69,31 @@ Below is a list of the command-line arguments available for `main.py`:
 
 If no `--save_dir` is specified, logs will be saved in `./logs/YYYY-MM-DD-HH-MM-SS`. If a `--suffix` is provided, logs will be saved in `./logs/YYYY-MM-DD-HH-MM-SS/SUFFIX`.
 
+### Demo
+We have a demo script to demonstrate the performance of the TD algorithm implemented by the linear transformer under our theoretical construction.
+The script generates a figure of the mean square value error (MSVE) averaged over the number of randomly generated MRPs against a sequence of increasing context lengths.
+Note that we employ fully representable value functions here to make sure the minimum MSVE is zero.
+
+To run the script, use
+```bash
+python demo.py [options]
+```
+Below is a list of the command-line arguments available for `demo.py`:
+
+- `-d`, `--dim_feature`: Feature dimension (default: 5)
+- `-l`, `--num_layers`: Number of transformer layers/TD updates (default: 15)
+- `-smin`, `--min_state_num`: Minimum possible state number of the randomly generated MRP (default: 5)
+- `-smax`, `--max_state_num`: Maximum possible state number of the randomly generated MRP (default: 15)
+- `--gamma`: Discount factor (default: 0.9)
+- `--lr`: learning rate of the implemented in-context TD algorithm (default: 0.2)
+- `--n_mrps`: Number of randomly generated MRPs to test on (default: 300)
+- `-nmin`, `--min_ctxt_len`: Minimum context length (default: 1)
+- `-nmax`, `--max_ctxt_len`: Maximum context length (default: 40)
+- `--ctxt_step`: Context length increment step (default: 2)
+- `--seed`: Random seed (default: 42)
+- `--save_dir`: Directory to save demo results (default: 'logs')
+
+By default, the result is saved to `./logs/demo`.
 ### Complete Replication
 To run all the experiments from the paper in one go, execute the following shell script:
 ```bash
