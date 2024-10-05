@@ -57,10 +57,3 @@ class Loop(MRP):
         next_state = np.random.choice(self.n_states, p=self.P[state])
         reward = self.r[state, 0]
         return next_state, reward
-
-
-if __name__ == '__main__':
-    np.random.seed(0)
-    mrp = Loop(5, threshold=0.6)
-    print(mrp.P)
-    print(mrp.steady_d)
