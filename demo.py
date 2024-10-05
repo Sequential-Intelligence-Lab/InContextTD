@@ -36,15 +36,12 @@ if __name__ == '__main__':
     parser.add_argument('--seed', type=int,
                         help='random seed', default=42)
     parser.add_argument('--save_dir', type=str,
-                        help='directory to save demo result', default=None)
+                        help='directory to save demo result', default='logs')
 
     args: Namespace = parser.parse_args()
 
-    if args.save_dir is not None:
-        save_path = os.path.join(args.save_dir, 'demo')
-    else:
-        save_path = os.path.join('logs', 'demo')
-
+    save_path = os.path.join(args.save_dir, 'demo')
+ 
     os.makedirs(save_path, exist_ok=True)
 
     set_seed(args.seed)
