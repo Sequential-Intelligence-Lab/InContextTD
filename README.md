@@ -70,7 +70,7 @@ Below is a list of the command-line arguments available for `main.py`:
 If no `--save_dir` is specified, logs will be saved in `./logs/YYYY-MM-DD-HH-MM-SS`. If a `--suffix` is provided, logs will be saved in `./logs/YYYY-MM-DD-HH-MM-SS/SUFFIX`.
 
 ### Demo
-We have a demo script to demonstrate the performance of the TD algorithm implemented by the linear transformer under our theoretical construction.
+We have a demo script to demonstrate the performance of the TD algorithm implemented by the linear transformer under our theoretical construction (Figure 1).
 The script generates a figure of the mean square value error (MSVE) averaged over the number of randomly generated MRPs against a sequence of increasing context lengths.
 Note that we employ fully representable value functions here to make sure the minimum MSVE is zero.
 <p align="center">
