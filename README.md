@@ -8,7 +8,10 @@ Welcome to the InContextTD repository, which accompanies the paper: [Transformer
 - [Usage](#usage)
   - [Quick Start](#quick-start)
   - [Custom Experiments](#custom-experiment-settings)
+  - [Demo](#demo)
+  - [Theory Verification](#theory-verification)
   - [Complete Replication](#complete-replication)
+  - [Test](#test)
 - [License](#license)
 
 ## Introduction
@@ -70,7 +73,7 @@ Below is a list of the command-line arguments available for `main.py`:
 If no `--save_dir` is specified, logs will be saved in `./logs/YYYY-MM-DD-HH-MM-SS`. If a `--suffix` is provided, logs will be saved in `./logs/YYYY-MM-DD-HH-MM-SS/SUFFIX`.
 
 ### Demo
-We have a demo script to demonstrate the performance of the TD algorithm implemented by the linear transformer under our theoretical construction (Figure 1).
+We have a demo script to demonstrate the performance of the TD algorithm implemented by the linear transformer under our theoretical construction.
 The script generates a figure of the mean square value error (MSVE) averaged over the number of randomly generated MRPs against a sequence of increasing context lengths.
 Note that we employ fully representable value functions here to make sure the minimum MSVE is zero.
 <p align="center">
@@ -97,11 +100,7 @@ Below is a list of the command-line arguments available for `demo.py`:
 - `--save_dir`: Directory to save demo results (default: 'logs')
 
 By default, the result is saved to `./logs/demo`.
-### Complete Replication
-To run all the experiments from the paper in one go, execute the following shell script:
-```bash
-./run.sh
-```
+
 ### Theory Verification
 We provide a script to numerically verify our theories.
 The script computes the absolute errors in log scale between the value predictions by the linear transformers and the direct implementations of their corresponding in-context algorithms.
@@ -122,5 +121,17 @@ Below is a list of the command-line arguments available for `verify.py`:
 - `--save_dir`: Directory to save theory verification results (default: 'logs')
 
 By default, the result is saved to `./logs/theory`.
+
+### Complete Replication
+To run all the experiments from the paper in one go, execute the following shell script:
+```bash
+./run.sh
+```
+### Test
+To test run the experiments in small scale, execute the following shell script:
+```bash
+./test.sh
+```
+The test results are stored in `./logs/test`.
 ## License
 This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for more information.
