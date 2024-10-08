@@ -1,8 +1,12 @@
+import os
+
 import matplotlib.pyplot as plt
 import numpy as np
 import scienceplots
 
 plt.rcParams['text.usetex'] = True
+
+
 def load_data():
     avg_reward = np.load('logs/theory/avg_reward_td.npy')
     td = np.load('logs/theory/discounted_td.npy')
@@ -17,7 +21,7 @@ def load_data():
     return xs, data
 
 
-def plot_error():
+def plot_error(save_dir: str):
     plt.style.use('science')
     xs, data = load_data()
     styles = ['solid', 'dashdot', 'dotted', 'dashed']
@@ -29,12 +33,9 @@ def plot_error():
         plt.plot(xs, log_mean, label=key, linestyle=style)
         plt.fill_between(xs, log_mean - ste, log_mean + ste, alpha=0.3)
     plt.xlabel('Layers', fontsize=20)
-    plt.ylabel('$\log \left| -\left<\phi_n, w_l\\right> - y_l^{(n+1)} \\right|$', rotation=0, labelpad=100, fontsize=20)
+    plt.ylabel('$\log \left| -\left<\phi_n, w_l\\right> - y_l^{(n+1)} \\right|$',
+               rotation=0, labelpad=100, fontsize=20)
     plt.legend(fontsize=18)
     plt.tight_layout()
-    plt.savefig('logs/theory/log_error.pdf')
+    plt.savefig(os.path.join(save_dir, 'log_error.pdf'))
     plt.close(fig)
-
-
-if __name__ == '__main__':
-    plot_error()

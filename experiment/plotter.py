@@ -353,12 +353,3 @@ def compute_weight_metrics(attn_params: dict,
         Q_metrics[key] = np.array([value])  # shape (1, T, l)
 
     return P_metrics, Q_metrics
-
-
-if __name__ == '__main__':
-    runs_directory = os.path.join(
-        './logs', 'nonlinear_discounted_train', '2024-05-10-01-06-39_standard')
-    runs_to_plot = [run for run in os.listdir(
-        runs_directory) if run.startswith('seed')]
-    plot_attn_params([os.path.join(runs_directory, run)
-                           for run in runs_to_plot], runs_directory)

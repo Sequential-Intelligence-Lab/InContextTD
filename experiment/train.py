@@ -17,8 +17,6 @@ from utils import (compare_sensitivity, compute_msve, implicit_weight_sim,
 def _init_log() -> dict:
     log = {'xs': [],
            'alpha': [],
-           #'mstde': [],
-           #'mstde hard': [],
            'v_tf v_td msve': [],
            'implicit_weight_sim': [],
            'sensitivity cos sim': [],
@@ -84,12 +82,14 @@ def train(d: int,
 
     set_seed(random_seed)
 
-   
-    tf = Transformer(d, n, l, activation=activation, mode=mode) # trainable transformer
-    tf_batch_td = HardLinearTransformer(d, n, l) # this is the hardcoded transformer that implements Batch TD with fixed weights
+    tf = Transformer(d, n, l, activation=activation,
+                     mode=mode)  # trainable transformer
+    # this is the hardcoded transformer that implements Batch TD with fixed weights
+    tf_batch_td = HardLinearTransformer(d, n, l)
 
-    opt = optim.Adam(tf.parameters(), lr=lr, weight_decay=weight_decay)    
-    opt_hard = optim.Adam(tf_batch_td.parameters(), lr=lr, weight_decay=weight_decay)
+    opt = optim.Adam(tf.parameters(), lr=lr, weight_decay=weight_decay)
+    opt_hard = optim.Adam(tf_batch_td.parameters(),
+                          lr=lr, weight_decay=weight_decay)
     log = _init_log()
 
     pro_gen = MRPPromptGenerator(s, d, n, gamma)
@@ -115,14 +115,14 @@ def train(d: int,
                 mstde_hard += tde_hard**2
                 v_current = v_next
                 v_hard_current = v_hard_next
-            mstde /= mini_batch_size # MSTDE for the trainable transformer
-            mstde_hard /= mini_batch_size # MSTDE for the hardcoded transformer
+            mstde /= mini_batch_size  # MSTDE for the trainable transformer
+            mstde_hard /= mini_batch_size  # MSTDE for the hardcoded transformer
             opt.zero_grad()
             mstde.backward()
             opt.step()
             # the learning rate for batch td (alpha) is still trainable so we need to backpropagate
             opt_hard.zero_grad()
-            mstde_hard.backward() 
+            mstde_hard.backward()
             opt_hard.step()
 
         if i % log_interval == 0:
@@ -161,14 +161,16 @@ def train(d: int,
                     np.stack([layer.Q.detach().numpy().copy() for layer in tf.layers]))
 
     _save_log(log, save_dir)
-    
+
     hyperparameters = {
         'd': d,
         's': s,
         'n': n,
         'l': l,
         'gamma': gamma,
+        'activation': activation,
         'sample_weight': sample_weight,
+        'mode': mode,
         'n_mrps': n_mrps,
         'mini_batch_size': mini_batch_size,
         'n_batch_per_mrp': n_batch_per_mrp,
@@ -176,11 +178,9 @@ def train(d: int,
         'weight_decay': weight_decay,
         'log_interval': log_interval,
         'random_seed': random_seed,
-        'mode': mode,
-        'linear': True
+        'linear': True if activation == 'identity' else False
     }
 
     # Save hyperparameters as JSON
     with open(os.path.join(save_dir, 'params.json'), 'w') as f:
         json.dump(hyperparameters, f)
-

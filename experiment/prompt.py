@@ -187,31 +187,3 @@ class MRPPromptGenerator:
         assert self.mrp is not None, "call reset_mrp first"
         assert self.feat is not None, "call reset_feat first"
         return MRPPrompt(self.d, self.n, self.gamma, self.mrp, self.feat)
-
-
-if __name__ == '__main__':
-    d = 3
-    s = 10
-    n = 6
-    eval_len = 3
-    gamma = 0.9
-
-    prompt_gen = MRPPromptGenerator(s, d, n, gamma)
-    prompt_gen.reset_feat()
-    prompt_gen.reset_mrp(sample_weight=False)
-    mrp_prompt = prompt_gen.get_prompt()
-    Z_0 = mrp_prompt.reset()
-    print(Z_0)
-    Z_1 = mrp_prompt.step()
-    print(Z_1)
-
-    prompt_gen.reset_feat()
-    prompt_gen.reset_mrp(sample_weight=True)
-    mrp_prompt = prompt_gen.get_prompt()
-    Z_0 = mrp_prompt.reset()
-    print(Z_0)
-    Z_1 = mrp_prompt.step()
-    print(Z_1)
-
-    pro = mrp_prompt.copy()
-    print(pro.mrp.w)
