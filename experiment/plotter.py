@@ -217,7 +217,7 @@ def plot_weight_metrics(data_dirs: str,
     Q_metrics_lst = []
     log, hyperparams_0 = load_data(data_dirs[0])
     d = hyperparams_0['d']
-    l = params['l'] if hyperparams_0['mode'] == 'sequential' else 1
+    l = hyperparams_0['l'] if hyperparams_0['mode'] == 'sequential' else 1
     is_linear = hyperparams_0['linear']
 
     # Load data from directories
