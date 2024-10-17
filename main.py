@@ -9,7 +9,7 @@ from experiment.plotter import (plot_attn_params, plot_error_data,
 from experiment.train import train
 
 
-def run_training_for_seed(seed: int, train_args: Namespace, is_linear: bool):
+def run_training_for_seed(seed: int, train_args: Namespace, is_linear: bool, use_mamba: bool):
     data_dir = os.path.join(train_args['save_dir'], f'seed_{seed}')
     train_args['save_dir'] = data_dir
     train_args['random_seed'] = seed
@@ -22,10 +22,12 @@ def run_training_for_seed(seed: int, train_args: Namespace, is_linear: bool):
         os.makedirs(figure_dir)
 
     plot_error_data([data_dir], figure_dir)
-    plot_attn_params([data_dir], figure_dir)
-    if is_linear:
-        # the weight metrics are only sensible for linear transformers
-        plot_weight_metrics([data_dir], figure_dir)
+
+    if not use_mamba:
+        plot_attn_params([data_dir], figure_dir)
+        if is_linear:
+            # the weight metrics are only sensible for linear transformers
+            plot_weight_metrics([data_dir], figure_dir)
 
 
 if __name__ == '__main__':
@@ -69,6 +71,7 @@ if __name__ == '__main__':
                         action='store_true')
     parser.add_argument('-v', '--verbose', action='store_true',
                         help='print training details')
+    parser.add_argument('--use_mamba', action='store_true')
 
     args: Namespace = parser.parse_args()
     if args.save_dir:
@@ -96,6 +99,7 @@ if __name__ == '__main__':
         n_batch_per_mrp=args.n_batch_per_mrp,
         log_interval=args.log_interval,
         save_dir=save_dir,
+        use_mamba=args.use_mamba
     )
 
     if args.verbose:
@@ -119,9 +123,10 @@ if __name__ == '__main__':
         print(f'Random seeds: {",".join(map(str, args.seed))}')
 
     is_linear = args.activation == 'identity'
+    use_mamba = args.use_mamba
 
-    Parallel(n_jobs=-1)(
-        delayed(run_training_for_seed)(seed, base_train_args, is_linear) for seed in args.seed
+    Parallel(n_jobs=4)(
+        delayed(run_training_for_seed)(seed, base_train_args, is_linear, use_mamba) for seed in args.seed
     )
 
     data_dirs = []
@@ -135,6 +140,8 @@ if __name__ == '__main__':
         os.makedirs(average_figures_dir)
 
     plot_error_data(data_dirs, average_figures_dir)
-    plot_attn_params(data_dirs, average_figures_dir)
-    if is_linear:
-        plot_weight_metrics(data_dirs, average_figures_dir)
+
+    if not use_mamba:
+        plot_attn_params(data_dirs, average_figures_dir)
+        if is_linear:
+            plot_weight_metrics(data_dirs, average_figures_dir)

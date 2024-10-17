@@ -7,7 +7,7 @@ import torch
 import torch.optim as optim
 from tqdm import tqdm
 
-from experiment.model import HardLinearTransformer, Transformer
+from experiment.model import HardLinearTransformer, Transformer, MambaSSM
 from experiment.prompt import MRPPromptGenerator
 from MRP.mrp import MRP
 from utils import (compare_sensitivity, compute_msve, implicit_weight_sim,
@@ -58,7 +58,8 @@ def train(d: int,
           n_batch_per_mrp: int = 5,
           log_interval: int = 10,
           save_dir: str = None,
-          random_seed: int = 2):
+          random_seed: int = 2,
+          use_mamba: bool = False):
     '''
     d: feature dimension
     s: number of states
@@ -82,12 +83,15 @@ def train(d: int,
 
     set_seed(random_seed)
 
-    tf = Transformer(d, n, l, activation=activation,
-                     mode=mode)  # trainable transformer
+    if use_mamba:
+        model = MambaSSM(d)
+    else:
+        model = Transformer(d, n, l, activation=activation, mode=mode)
+
     # this is the hardcoded transformer that implements Batch TD with fixed weights
     tf_batch_td = HardLinearTransformer(d, n, l)
 
-    opt = optim.Adam(tf.parameters(), lr=lr, weight_decay=weight_decay)
+    opt = optim.Adam(model.parameters(), lr=lr, weight_decay=weight_decay)
     opt_hard = optim.Adam(tf_batch_td.parameters(),
                           lr=lr, weight_decay=weight_decay)
     log = _init_log()
@@ -103,11 +107,11 @@ def train(d: int,
             mstde = 0.0
             mstde_hard = 0.0
             Z_0 = prompt.reset()
-            v_current = tf.pred_v(Z_0)
+            v_current = model.pred_v(Z_0)
             v_hard_current = tf_batch_td.pred_v(Z_0)
             for _ in range(mini_batch_size):
                 Z_next, reward = prompt.step()  # slide window
-                v_next = tf.pred_v(Z_next)
+                v_next = model.pred_v(Z_next)
                 v_hard_next = tf_batch_td.pred_v(Z_next)
                 tde = reward + gamma*v_next.detach() - v_current
                 tde_hard = reward + gamma*v_hard_next.detach() - v_hard_current
@@ -131,7 +135,7 @@ def train(d: int,
             phi: np.ndarray = prompt.get_feature_mat().numpy()
             steady_d: np.ndarray = mrp.steady_d
 
-            v_tf: np.ndarray = tf.fit_value_func(
+            v_tf: np.ndarray = model.fit_value_func(
                 prompt.context(), torch.from_numpy(phi)).detach().numpy()
             v_td: np.ndarray = tf_batch_td.fit_value_func(
                 prompt.context(), torch.from_numpy(phi)).detach().numpy()
@@ -144,21 +148,25 @@ def train(d: int,
             log['v_tf v_td msve'].append(compute_msve(v_tf, v_td, steady_d))
 
             # Sensitivity Similarity (SS)
-            sens_cos_sim = compare_sensitivity(tf, tf_batch_td, prompt)
+            sens_cos_sim = compare_sensitivity(model, tf_batch_td, prompt)
             log['sensitivity cos sim'].append(sens_cos_sim)
 
             # Implicit Weight Similarity (IWS)
             iws = implicit_weight_sim(v_tf, tf_batch_td, prompt)
             log['implicit_weight_sim'].append(iws)
 
-            if mode == 'auto':
-                log['P'].append([tf.attn.P.detach().numpy().copy()])
-                log['Q'].append([tf.attn.Q.detach().numpy().copy()])
+            if use_mamba:
+                # save mamba params
+                pass
             else:
-                log['P'].append(
-                    np.stack([layer.P.detach().numpy().copy() for layer in tf.layers]))
-                log['Q'].append(
-                    np.stack([layer.Q.detach().numpy().copy() for layer in tf.layers]))
+                if mode == 'auto':
+                    log['P'].append([model.attn.P.detach().numpy().copy()])
+                    log['Q'].append([model.attn.Q.detach().numpy().copy()])
+                else:
+                    log['P'].append(
+                        np.stack([layer.P.detach().numpy().copy() for layer in model.layers]))
+                    log['Q'].append(
+                        np.stack([layer.Q.detach().numpy().copy() for layer in model.layers]))
 
     _save_log(log, save_dir)
 

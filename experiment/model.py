@@ -1,6 +1,8 @@
 import torch
 import torch.nn as nn
 
+from mamba_ssm import Mamba
+
 from utils import stack_four
 
 
@@ -183,6 +185,39 @@ class HardLinearTransformer(nn.Module):
         '''
         Z_tf = self.forward(Z)
         return -Z_tf[-1, -1]
+
+
+class MambaSSM(nn.Module):
+    def __init__(self,
+                 d: int):
+        super(MambaSSM, self).__init__()
+        self.d = d
+        self.model = Mamba(d_model=2*d+1, d_state=16, d_conv=4, expand=2).to("cuda")    # DIFFERENT PARAMS?
+
+    def forward(self, Z):
+        Z.transpose_(0, 1)
+        Z.unsqueeze_(0)
+        Z = self.model(Z.to("cuda"))
+        Z.squeeze_(0)
+        Z.transpose_(0, 1)
+        return Z.cpu()
+    
+    def fit_value_func(self,
+                       context: torch.Tensor,
+                       phi: torch.Tensor):
+        v_vec = []
+        for feature in phi:
+            feature_col = torch.zeros((2 * self.d + 1, 1))
+            feature_col[:self.d, 0] = feature
+            Z_p = torch.cat([context, feature_col], dim=1)
+            v = self.pred_v(Z_p)
+            v_vec.append(v)
+        mamba_v = torch.stack(v_vec, dim=0).unsqueeze(1)
+        return mamba_v
+    
+    def pred_v(self, Z):
+        Z_mamba = self.forward(Z.clone())
+        return -Z_mamba[-1, -1]         # NEGATIVE OUTPUT?
 
 
 def get_activation(activation: str) -> nn.Module:
