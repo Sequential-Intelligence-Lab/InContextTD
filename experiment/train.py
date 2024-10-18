@@ -84,15 +84,17 @@ def train(d: int,
     set_seed(random_seed)
 
     if use_mamba:
-        model = MambaSSM(d)
+        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        model = MambaSSM(d, device).to(device)
     else:
+        device = torch.device('cpu')
         model = Transformer(d, n, l, activation=activation, mode=mode)
 
     # this is the hardcoded transformer that implements Batch TD with fixed weights
-    tf_batch_td = HardLinearTransformer(d, n, l)
+    batch_td = HardLinearTransformer(d, n, l)
 
     opt = optim.Adam(model.parameters(), lr=lr, weight_decay=weight_decay)
-    opt_hard = optim.Adam(tf_batch_td.parameters(),
+    opt_hard = optim.Adam(batch_td.parameters(),
                           lr=lr, weight_decay=weight_decay)
     log = _init_log()
 
@@ -107,12 +109,12 @@ def train(d: int,
             mstde = 0.0
             mstde_hard = 0.0
             Z_0 = prompt.reset()
-            v_current = model.pred_v(Z_0)
-            v_hard_current = tf_batch_td.pred_v(Z_0)
+            v_current = model.pred_v(Z_0.to(device)).cpu()
+            v_hard_current = batch_td.pred_v(Z_0)
             for _ in range(mini_batch_size):
                 Z_next, reward = prompt.step()  # slide window
-                v_next = model.pred_v(Z_next)
-                v_hard_next = tf_batch_td.pred_v(Z_next)
+                v_next = model.pred_v(Z_next.to(device)).cpu()
+                v_hard_next = batch_td.pred_v(Z_next)
                 tde = reward + gamma*v_next.detach() - v_current
                 tde_hard = reward + gamma*v_hard_next.detach() - v_hard_current
                 mstde += tde**2
@@ -135,28 +137,28 @@ def train(d: int,
             phi: np.ndarray = prompt.get_feature_mat().numpy()
             steady_d: np.ndarray = mrp.steady_d
 
-            v_tf: np.ndarray = model.fit_value_func(
-                prompt.context(), torch.from_numpy(phi)).detach().numpy()
-            v_td: np.ndarray = tf_batch_td.fit_value_func(
+            v_model: np.ndarray = model.fit_value_func(
+                prompt.context().to(device), torch.from_numpy(phi).to(device)).detach().cpu().numpy()
+            v_td: np.ndarray = batch_td.fit_value_func(
                 prompt.context(), torch.from_numpy(phi)).detach().numpy()
 
             log['xs'].append(i)
 
-            log['alpha'].append(tf_batch_td.attn.alpha.item())
+            log['alpha'].append(batch_td.attn.alpha.item())
 
             # Value Difference (VD)
-            log['v_tf v_td msve'].append(compute_msve(v_tf, v_td, steady_d))
+            log['v_tf v_td msve'].append(compute_msve(v_model, v_td, steady_d))     # TODO: fix logging labels
 
             # Sensitivity Similarity (SS)
-            sens_cos_sim = compare_sensitivity(model, tf_batch_td, prompt)
+            sens_cos_sim = compare_sensitivity(model, batch_td, prompt)
             log['sensitivity cos sim'].append(sens_cos_sim)
 
             # Implicit Weight Similarity (IWS)
-            iws = implicit_weight_sim(v_tf, tf_batch_td, prompt)
+            iws = implicit_weight_sim(v_model, batch_td, prompt)
             log['implicit_weight_sim'].append(iws)
 
             if use_mamba:
-                # save mamba params
+                # TODO: implement logging for mamba parameters
                 pass
             else:
                 if mode == 'auto':

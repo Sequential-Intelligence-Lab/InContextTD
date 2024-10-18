@@ -23,7 +23,10 @@ def run_training_for_seed(seed: int, train_args: Namespace, is_linear: bool, use
 
     plot_error_data([data_dir], figure_dir)
 
-    if not use_mamba:
+    if use_mamba:
+        # TODO: mamba parameter plotting
+        pass
+    else:
         plot_attn_params([data_dir], figure_dir)
         if is_linear:
             # the weight metrics are only sensible for linear transformers
@@ -125,9 +128,14 @@ if __name__ == '__main__':
     is_linear = args.activation == 'identity'
     use_mamba = args.use_mamba
 
-    Parallel(n_jobs=4)(
-        delayed(run_training_for_seed)(seed, base_train_args, is_linear, use_mamba) for seed in args.seed
-    )
+    if use_mamba:
+        Parallel(n_jobs=4)(
+            delayed(run_training_for_seed)(seed, base_train_args, is_linear, use_mamba) for seed in args.seed
+        )
+    else:
+        Parallel(n_jobs=-1)(
+            delayed(run_training_for_seed)(seed, base_train_args, is_linear, use_mamba) for seed in args.seed
+        )
 
     data_dirs = []
     for seed in args.seed:
@@ -141,7 +149,10 @@ if __name__ == '__main__':
 
     plot_error_data(data_dirs, average_figures_dir)
 
-    if not use_mamba:
+    if use_mamba:
+        # TODO: mamba parameter plotting
+        pass
+    else:
         plot_attn_params(data_dirs, average_figures_dir)
         if is_linear:
             plot_weight_metrics(data_dirs, average_figures_dir)

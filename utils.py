@@ -125,9 +125,9 @@ def compare_sensitivity(tf,
         prompt.set_query(feature)
         prompt.enable_query_grad()
 
-        tf_v = tf.pred_v(prompt.z())
+        tf_v = tf.pred_v(prompt.z().to('cuda'))
         tf_v.backward()
-        tf_grad = prompt.query_grad().numpy()
+        tf_grad = prompt.query_grad().cpu().numpy()         # TODO: refactor this to train.py
         prompt.zero_query_grad()
 
         tf_v_hard = tf_hard.pred_v(prompt.z())
