@@ -29,7 +29,6 @@ def _init_save_dir(save_dir: str) -> None:
     if save_dir is None:
         startTime = datetime.datetime.now()
         save_dir = os.path.join('./logs',
-                                "train",
                                 startTime.strftime("%Y-%m-%d-%H-%M-%S"))
 
     # Create directory if it doesn't exist
