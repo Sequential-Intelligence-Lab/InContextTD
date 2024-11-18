@@ -1,5 +1,6 @@
 import datetime
 import os
+import numpy as np
 from argparse import ArgumentParser, Namespace
 
 from joblib import Parallel, delayed
@@ -30,6 +31,8 @@ def run_training_for_seed(seed: int, train_args: Namespace, is_linear: bool):
 
 if __name__ == '__main__':
     parser = ArgumentParser()
+    parser.add_argument('-mrp', '--mrp_env', type=str,
+                        help='MRP environment', default='boyan')
     parser.add_argument('-d', '--dim_feature', type=int,
                         help='feature dimension', default=4)
     parser.add_argument('-s', '--num_states', type=int,
@@ -80,7 +83,14 @@ if __name__ == '__main__':
     if args.suffix:
         save_dir = os.path.join(save_dir, args.suffix)
 
+    if args.mrp_env == 'cartpole':
+        args.num_states = np.inf
+        if args.representable:
+            raise ValueError(
+                "Cartpole MRP does not support representable value function.")
+
     base_train_args = dict(
+        mrp_class=args.mrp_env,
         d=args.dim_feature,
         s=args.num_states,
         n=args.context_length,
@@ -99,6 +109,7 @@ if __name__ == '__main__':
     )
 
     if args.verbose:
+        print(f'Training with {args.mrp_env} MRP.')
         print(
             f'Training {args.mode} transformer of {args.num_layers} layer(s).')
         print(f'Activation function: {args.activation}')
@@ -120,9 +131,11 @@ if __name__ == '__main__':
 
     is_linear = args.activation == 'identity'
 
-    Parallel(n_jobs=-1)(
-        delayed(run_training_for_seed)(seed, base_train_args, is_linear) for seed in args.seed
-    )
+    #Parallel(n_jobs=-1)(
+    #    delayed(run_training_for_seed)(seed, base_train_args, is_linear) for seed in args.seed
+    #)
+    for seed in args.seed:
+        run_training_for_seed(seed, base_train_args, is_linear)
 
     data_dirs = []
     for seed in args.seed:

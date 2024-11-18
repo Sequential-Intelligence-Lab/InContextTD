@@ -6,6 +6,7 @@ import torch
 from MRP.boyan import BoyanChain
 from MRP.loop import Loop
 from MRP.mrp import MRP
+from MRP.cart_pole import CartPoleEnvironment
 from typing import Tuple
 
 class Feature:
@@ -17,17 +18,26 @@ class Feature:
         '''
         self.d = d
         self.s = s
-        if mode == 'random':
-            self.phi = np.random.uniform(low=-1, high=1,
-                                         size=(s, d)).astype(np.float32)
-        elif mode == 'one-hot':
-            assert s == d, "number of states must be equal to the feature dimension"
-            self.phi = np.eye(s, dtype=np.float32)
+        if np.isinf(s):
+            self.A = np.random.randn(d,4).astype(np.float32)
         else:
-            raise ValueError("Unknown mode")
+            if mode == 'random':
+                self.phi = np.random.uniform(low=-1, high=1,
+                                            size=(s, d)).astype(np.float32)
+            elif mode == 'one-hot':
+                assert s == d, "number of states must be equal to the feature dimension"
+                self.phi = np.eye(s, dtype=np.float32)
+            else:
+                raise ValueError("Unknown mode")
 
-    def __call__(self, s: int):
-        return self.phi[s]
+    def __call__(self, s):
+        if isinstance(s, int): # if s is an integer then return the feature vector of the state
+            return self.phi[s]
+        elif isinstance(s, np.ndarray): # if is already a vector, then return its transformation to a feature vector
+            #import pdb; pdb.set_trace()
+            return self.A @ s
+        else:
+            raise ValueError("s must be an int or a numpy array")
 
     def copy(self) -> 'Feature':
         f = Feature(self.d, self.s)
@@ -60,10 +70,10 @@ class MRPPrompt:
         self.reward_window = deque(maxlen=self.n+1)
         # populates the feature and rewards
         self.s = self.mrp.reset()
-        self.feature_window.append(self.feature_fun(self.s))
+        self.feature_window.append(self.feature_fun(np.array(self.s)))
         for _ in range(self.n+1):
             s_prime, r = self.mrp.step(self.s)
-            self.feature_window.append(self.feature_fun(s_prime))
+            self.feature_window.append(self.feature_fun(np.array(s_prime)))
             self.reward_window.append(r)
             self.s = s_prime
 
@@ -74,7 +84,7 @@ class MRPPrompt:
     def step(self) -> Tuple[torch.Tensor, float]:
         # step the MRP
         s_prime, r = self.mrp.step(self.s)
-        self.feature_window.append(self.feature_fun(s_prime))
+        self.feature_window.append(self.feature_fun(np.array(s_prime)))
         self.reward_window.append(r)
         self.s = s_prime
 
@@ -114,6 +124,8 @@ class MRPPrompt:
         self._query.grad = None
 
     def get_feature_mat(self) -> torch.Tensor:
+        if self.feature_fun.s == np.inf: # cannot return feature matrix for continuous state space
+            return None
         return torch.from_numpy(self.feature_fun.phi)
 
     def z(self) -> torch.Tensor:
@@ -177,6 +189,8 @@ class MRPPromptGenerator:
         elif self.mrp_class == 'loop':
             self.mrp = Loop(n_states=self.s, gamma=self.gamma, threshold=threshold,
                             weight=w, Phi=self.feat.phi)
+        elif self.mrp_class == 'cartpole':
+            self.mrp = CartPoleEnvironment()
         else:
             raise ValueError("Unknown MRP type")
 
