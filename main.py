@@ -8,6 +8,9 @@ from joblib import Parallel, delayed
 from experiment.plotter import (plot_attn_params, plot_error_data,
                                 plot_weight_metrics)
 from experiment.train import train
+import torch
+from torch.utils.tensorboard import SummaryWriter
+writer = SummaryWriter()
 
 
 def run_training_for_seed(seed: int, train_args: Namespace, is_linear: bool):
@@ -38,7 +41,7 @@ if __name__ == '__main__':
     parser.add_argument('-s', '--num_states', type=int,
                         help='number of states', default=10)
     parser.add_argument('-n', '--context_length', type=int,
-                        help='context length', default=30)
+                        help='context length', default=50)
     parser.add_argument('-l', '--num_layers', type=int,
                         help='number of layers', default=3)
     parser.add_argument('--gamma', type=float,
@@ -62,7 +65,7 @@ if __name__ == '__main__':
     parser.add_argument('--mode', type=str,
                         help='training mode: auto-regressive or sequential', default='auto', choices=['auto', 'sequential'])
     parser.add_argument('--seed', type=int, nargs='+',
-                        help='random seed', default=list(range(0, 30)))
+                        help='random seed', default=list(range(0, 10)))
     parser.add_argument('--save_dir', type=str,
                         help='directory to save logs', default=None)
     parser.add_argument('--suffix', type=str,
@@ -131,11 +134,11 @@ if __name__ == '__main__':
 
     is_linear = args.activation == 'identity'
 
-    #Parallel(n_jobs=-1)(
-    #    delayed(run_training_for_seed)(seed, base_train_args, is_linear) for seed in args.seed
-    #)
-    for seed in args.seed:
-        run_training_for_seed(seed, base_train_args, is_linear)
+    Parallel(n_jobs=-1)(
+        delayed(run_training_for_seed)(seed, base_train_args, is_linear) for seed in args.seed
+    )
+    #for seed in args.seed:
+    #    run_training_for_seed(seed, base_train_args, is_linear)
 
     data_dirs = []
     for seed in args.seed:

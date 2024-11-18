@@ -20,6 +20,7 @@ class Feature:
         self.s = s
         if np.isinf(s):
             self.A = np.random.randn(d,4).astype(np.float32)
+            #self.A = np.eye(d, dtype=np.float32)
         else:
             if mode == 'random':
                 self.phi = np.random.uniform(low=-1, high=1,

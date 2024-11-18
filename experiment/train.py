@@ -105,7 +105,7 @@ def train(d: int,
             mstde = 0.0
             mstde_hard = 0.0
             Z_0 = prompt.reset()
-            print(Z_0)
+            #print(Z_0)
             v_current = tf.pred_v(Z_0)
             v_hard_current = tf_batch_td.pred_v(Z_0)
             for _ in range(mini_batch_size):

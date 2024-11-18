@@ -11,16 +11,18 @@ class CartPoleEnvironment(MRP):
 
     def __init__(self):
 
-        self.gravity = 9.8
-        self.masscart = 1.0
-        self.masspole = 0.1
+        #self.gravity = 9.8
+        self.gravity = np.random.uniform(low=7, high=12) # gravity is uniformly distributed
+        self.masscart = np.random.uniform(low=0.5, high=1.5) # masscart is uniformly distributed
+        self.masspole = np.random.uniform(low=0.1, high=0.3) # masspole is uniformly distributed
         self.total_mass = (self.masspole + self.masscart)
-        self.length = 0.5  # actually half the pole's length
+        self.length = np.random.uniform(low=0.25, high=.75)  # actually half the pole's length
         self.polemass_length = (self.masspole * self.length)
-        self.force_mag = 15.0
-        self.tau = 0.02  # seconds between state updates
+        self.force_mag = np.random.uniform(low=5, high=15) # force_mag is uniformly distributed
+        self.tau = np.random.uniform(low = 0.01, high = 0.05)  # seconds between state updates
         self.kinematics_integrator = 'euler'
-        self.epsilon = np.random.rand()
+        self.epsilon = np.random.rand() # epsilon controls the action distribution
+        self.reward_center = np.random.uniform(low=0.5, high=1.5) # sample a random number to center the rewards at
 
         # Angle at which to fail the episode
         self.theta_threshold_radians = 12 * 2 * math.pi / 360
@@ -73,10 +75,10 @@ class CartPoleEnvironment(MRP):
 
         # if we fall outside of the range, give a reward of -1 and then reset
         if not self.is_state_valid(next_state):
-            reward = 0.0
-            #next_state = self.reset()
+            reward = -1* np.random.uniform(low=self.reward_center-0.1, high=self.reward_center+0.1)
+            next_state = self.reset()
             #print('Resetting')
         else:
-            reward = 1.0
+            reward = np.random.uniform(low=self.reward_center-0.1, high=self.reward_center+0.1)
 
         return next_state, reward
