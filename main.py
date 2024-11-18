@@ -9,8 +9,7 @@ from experiment.plotter import (plot_attn_params, plot_error_data,
                                 plot_weight_metrics)
 from experiment.train import train
 import torch
-from torch.utils.tensorboard import SummaryWriter
-writer = SummaryWriter()
+
 
 
 def run_training_for_seed(seed: int, train_args: Namespace, is_linear: bool):
