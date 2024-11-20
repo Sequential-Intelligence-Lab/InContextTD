@@ -143,7 +143,7 @@ def train(d: int,
                     np.stack([layer.Q.detach().numpy().copy() for layer in tf.layers]))
 
             # some evaluation metrics are only computable for finite state spaces
-            if not np.isinf(s):
+            if mrp_class != 'cartpole':
                 phi: np.ndarray = prompt.get_feature_mat().numpy()
                 steady_d: np.ndarray = mrp.steady_d
 

@@ -10,11 +10,11 @@ from experiment.plotter import (plot_attn_params, plot_error_data,
 from experiment.train import train
 import torch
 from torch.utils.tensorboard import SummaryWriter
-writer = SummaryWriter()
 
 
 def run_training_for_seed(seed: int, train_args: Namespace, is_linear: bool):
     data_dir = os.path.join(train_args['save_dir'], f'seed_{seed}')
+    writer = SummaryWriter(data_dir)
     train_args['save_dir'] = data_dir
     train_args['random_seed'] = seed
 
@@ -41,17 +41,17 @@ if __name__ == '__main__':
     parser.add_argument('-s', '--num_states', type=int,
                         help='number of states', default=10)
     parser.add_argument('-n', '--context_length', type=int,
-                        help='context length', default=50)
+                        help='context length', default=100)
     parser.add_argument('-l', '--num_layers', type=int,
                         help='number of layers', default=3)
     parser.add_argument('--gamma', type=float,
-                        help='discount factor', default=0.9)
+                        help='discount factor', default=0.99)
     parser.add_argument('--activation', type=str,
                         help='activation function for the transformer', default='identity')
     parser.add_argument('--representable', action='store_true',
                         help='sample a random true weight vector, such that the value function is fully representable by the features')
     parser.add_argument('--n_mrps', type=int,
-                        help='total number of MRPs for training ', default=4_000)
+                        help='total number of MRPs for training ', default=5_000)
     parser.add_argument('--batch_size', type=int,
                         help='mini batch size', default=64)
     parser.add_argument('--n_batch_per_mrp', type=int,
@@ -65,7 +65,7 @@ if __name__ == '__main__':
     parser.add_argument('--mode', type=str,
                         help='training mode: auto-regressive or sequential', default='auto', choices=['auto', 'sequential'])
     parser.add_argument('--seed', type=int, nargs='+',
-                        help='random seed', default=list(range(0, 10)))
+                        help='random seed', default=list(range(0, 30)))
     parser.add_argument('--save_dir', type=str,
                         help='directory to save logs', default=None)
     parser.add_argument('--suffix', type=str,
@@ -87,7 +87,6 @@ if __name__ == '__main__':
         save_dir = os.path.join(save_dir, args.suffix)
 
     if args.mrp_env == 'cartpole':
-        args.num_states = np.inf
         if args.representable:
             raise ValueError(
                 "Cartpole MRP does not support representable value function.")
