@@ -11,7 +11,6 @@ from experiment.train import train
 import torch
 
 
-
 def run_training_for_seed(seed: int, train_args: Namespace, is_linear: bool):
     data_dir = os.path.join(train_args['save_dir'], f'seed_{seed}')
     train_args['save_dir'] = data_dir
@@ -34,7 +33,8 @@ def run_training_for_seed(seed: int, train_args: Namespace, is_linear: bool):
 if __name__ == '__main__':
     parser = ArgumentParser()
     parser.add_argument('-mrp', '--mrp_env', type=str,
-                        help='MRP environment', default='boyan')
+                        help='MRP environment', default='boyan',
+                        choices=['boyan', 'loop', 'cartpole'])
     parser.add_argument('-d', '--dim_feature', type=int,
                         help='feature dimension', default=4)
     parser.add_argument('-s', '--num_states', type=int,
@@ -124,7 +124,8 @@ if __name__ == '__main__':
         print(f"Number of MRPs for training: {args.n_mrps}")
         print(f'Number of mini-batches per MRP: {args.n_batch_per_mrp}')
         print(f'Mini-batch size: {args.batch_size}')
-        print(f'Total number of prompts for training: {args.n_mrps * args.n_batch_per_mrp * args.batch_size}')
+        print(
+            f'Total number of prompts for training: {args.n_mrps * args.n_batch_per_mrp * args.batch_size}')
         print(f'Learning rate: {args.lr}')
         print(f'Regularization term: {args.weight_decay}')
         print(f'Logging interval: {args.log_interval}')
@@ -136,7 +137,7 @@ if __name__ == '__main__':
     Parallel(n_jobs=-1)(
         delayed(run_training_for_seed)(seed, base_train_args, is_linear) for seed in args.seed
     )
-    #for seed in args.seed:
+    # for seed in args.seed:
     #    run_training_for_seed(seed, base_train_args, is_linear)
 
     data_dirs = []

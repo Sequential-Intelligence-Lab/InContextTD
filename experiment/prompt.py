@@ -9,6 +9,7 @@ from MRP.mrp import MRP
 from MRP.cart_pole import CartPoleEnvironment
 from typing import Tuple
 
+
 class Feature:
     def __init__(self, d: int, s: int, mode: str = 'random'):
         '''
@@ -19,12 +20,21 @@ class Feature:
         self.d = d
         self.s = s
         if np.isinf(s):
-            self.A = np.random.randn(d,4).astype(np.float32)
-            #self.A = np.eye(d, dtype=np.float32)
+            if mode == 'random':
+                # self.A = np.random.uniform(low=-1, high=1,
+                #                            size=(d, 4)).astype(np.float32)
+                # diagonal_entries = np.random.choice([-1, 1], size=4)
+                # self.A = np.diag(diagonal_entries).astype(np.float32)
+                self.A = np.random.uniform(low=-1, high=1,
+                                           size=(2, 2, 2, 2, d)).astype(np.float32)
+            elif mode == 'one-hot':
+                self.A = np.eye(4).astype(np.float32)
+            else:
+                raise ValueError("Unknown mode")
         else:
             if mode == 'random':
                 self.phi = np.random.uniform(low=-1, high=1,
-                                            size=(s, d)).astype(np.float32)
+                                             size=(s, d)).astype(np.float32)
             elif mode == 'one-hot':
                 assert s == d, "number of states must be equal to the feature dimension"
                 self.phi = np.eye(s, dtype=np.float32)
@@ -32,11 +42,12 @@ class Feature:
                 raise ValueError("Unknown mode")
 
     def __call__(self, s):
-        if isinstance(s, int): # if s is an integer then return the feature vector of the state
+        if isinstance(s, int):  # if s is an integer then return the feature vector of the state
             return self.phi[s]
-        elif isinstance(s, np.ndarray): # if is already a vector, then return its transformation to a feature vector
-            #import pdb; pdb.set_trace()
-            return self.A @ s
+        # if is already a vector, then return its transformation to a feature vector
+        elif isinstance(s, np.ndarray):
+            # import pdb; pdb.set_trace()
+            return self.A[*s]
         else:
             raise ValueError("s must be an int or a numpy array")
 
@@ -125,7 +136,7 @@ class MRPPrompt:
         self._query.grad = None
 
     def get_feature_mat(self) -> torch.Tensor:
-        if self.feature_fun.s == np.inf: # cannot return feature matrix for continuous state space
+        if self.feature_fun.s == np.inf:  # cannot return feature matrix for continuous state space
             return None
         return torch.from_numpy(self.feature_fun.phi)
 
