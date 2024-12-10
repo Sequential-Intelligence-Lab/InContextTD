@@ -59,7 +59,8 @@ def train(d: int,
           log_interval: int = 10,
           save_dir: str = None,
           random_seed: int = 2,
-          mrp_class: str = 'boyan') -> None:
+          mrp_class: str = 'boyan',
+          training_loss: str = 'mstde') -> None:
     '''
     d: feature dimension
     s: number of states
@@ -102,30 +103,56 @@ def train(d: int,
         pro_gen.reset_mrp(sample_weight=sample_weight)  # reset MRP
         prompt = pro_gen.get_prompt()  # get prompt object
         for _ in range(n_batch_per_mrp):
-            mstde = 0.0
-            mstde_hard = 0.0
+            loss = 0.0
+            loss_hard = 0.0
             Z_0 = prompt.reset()
-            #print(Z_0)
             v_current = tf.pred_v(Z_0)
             v_hard_current = tf_batch_td.pred_v(Z_0)
             for _ in range(mini_batch_size):
                 Z_next, reward = prompt.step()  # slide window
                 v_next = tf.pred_v(Z_next)
                 v_hard_next = tf_batch_td.pred_v(Z_next)
-                tde = reward + gamma*v_next.detach() - v_current
-                tde_hard = reward + gamma*v_hard_next.detach() - v_hard_current
-                mstde += tde**2
-                mstde_hard += tde_hard**2
+
+                # loss is the mean squared TD error
+                if training_loss == 'mstde':
+                    tde = reward + gamma*v_next.detach() - v_current
+                    tde_hard = reward + gamma*v_hard_next.detach() - v_hard_current
+                    loss += tde**2
+                    loss_hard += tde_hard**2
+                # loss is the mean squared value error with the true value function
+                elif training_loss == 'msve_true':
+                    query_state = prompt._query_s
+                    ve = torch.tensor(prompt.mrp.v[query_state]) - v_current
+                    loss += ve**2
+                    ve_hard = torch.tensor(pro_gen.mrp.v[query_state]) - v_hard_current
+                    loss_hard += ve_hard**2
+                # loss is the mean squared value error with a monte carlo estimate
+                elif training_loss == 'msve_mc':
+                    rollout_length = 40
+                    estimated_return = 0
+                    state = prompt._query_s
+                    # do a monte carlo rollout to estimate the return
+                    for j in range(rollout_length):
+                        s_prime, reward = prompt.mrp.step(state)
+                        estimated_return += reward * gamma**j
+                        state = s_prime
+                    loss+= (estimated_return - v_current)**2
+                    loss_hard+= (estimated_return - v_hard_current)**2
+                else:
+                    raise ValueError('Unknown training loss')
+                
                 v_current = v_next
                 v_hard_current = v_hard_next
-            mstde /= mini_batch_size  # MSTDE for the trainable transformer
-            mstde_hard /= mini_batch_size  # MSTDE for the hardcoded transformer
+
+            loss /= mini_batch_size  # MSTDE for the trainable transformer
+            loss_hard /= mini_batch_size  # MSTDE for the hardcoded transformer
+
             opt.zero_grad()
-            mstde.backward()
+            loss.backward()
             opt.step()
             # the learning rate for batch td (alpha) is still trainable so we need to backpropagate
             opt_hard.zero_grad()
-            mstde_hard.backward()
+            loss_hard.backward()
             opt_hard.step()
 
         if i % log_interval == 0:

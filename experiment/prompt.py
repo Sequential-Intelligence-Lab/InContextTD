@@ -18,7 +18,6 @@ class Feature:
         '''
         self.d = d
         self.s = s
-        #import pdb; pdb.set_trace()
         if mode == 'random':
             self.phi = np.random.uniform(low=-1, high=1,
                                         size=(s, d)).astype(np.float32)
@@ -70,14 +69,15 @@ class MRPPrompt:
         for _ in range(self.n+1):
             s_prime, r = self.mrp.step(self.s)
             if isinstance(s_prime, int):
-                self.feature_window.append(self.feature_fun(s_prime))   
+                self.feature_window.append(self.feature_fun(s_prime)) 
             else:
                 discretized_s_prime = self.mrp.get_discretized_feature_idx(s_prime)
                 self.feature_window.append(self.feature_fun(discretized_s_prime))
 
             self.reward_window.append(r)
             self.s = s_prime
-
+        #import pdb; pdb.set_trace()
+        self._query_s = self.s
         self._store_data()
 
         return self.z()
@@ -92,7 +92,7 @@ class MRPPrompt:
             self.feature_window.append(self.feature_fun(discretized_s_prime))
         self.reward_window.append(r)
         self.s = s_prime
-
+        self._query_s = self.s
         self._store_data()
         return self.z(), r
 
@@ -109,7 +109,7 @@ class MRPPrompt:
         return self._context
 
     def query(self) -> torch.Tensor:
-        return self._query
+        return self._query, self._query_s
 
     def set_query(self, query: torch.Tensor):
         query = query.reshape(self.d, 1)
@@ -161,6 +161,7 @@ class MRPPrompt:
         mrp_prompt.feature_window = self.feature_window.copy()
         mrp_prompt.reward_window = self.reward_window.copy()
         mrp_prompt.s = self.s
+        mrp_prompt._query_s = self._query_s
         mrp_prompt._store_data()
         return mrp_prompt
 
@@ -195,12 +196,12 @@ class MRPPromptGenerator:
             self.mrp = Loop(n_states=self.s, gamma=self.gamma, threshold=threshold,
                             weight=w, Phi=self.feat.phi)
         elif self.mrp_class == 'cartpole':
-            d_th_root_s = self.s**(1/self.d)
-            if not d_th_root_s.is_integer():
+            fourth_root_s = self.s**(1/4)
+            if not fourth_root_s.is_integer():
                 raise ValueError("The number of states must be a perfect power of the feature dimension")
-            d_th_root_s = int(d_th_root_s)
+            fourth_root_s = int(fourth_root_s)
 
-            self.mrp = CartPoleEnvironment(bins_per_feature=d_th_root_s)
+            self.mrp = CartPoleEnvironment(bins_per_feature=fourth_root_s)
         else:
             raise ValueError("Unknown MRP type")
 

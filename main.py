@@ -41,11 +41,11 @@ if __name__ == '__main__':
     parser.add_argument('-s', '--num_states', type=int,
                         help='number of states', default=10)
     parser.add_argument('-n', '--context_length', type=int,
-                        help='context length', default=100)
+                        help='context length', default=30)
     parser.add_argument('-l', '--num_layers', type=int,
                         help='number of layers', default=3)
     parser.add_argument('--gamma', type=float,
-                        help='discount factor', default=0.99)
+                        help='discount factor', default=0.9)
     parser.add_argument('--activation', type=str,
                         help='activation function for the transformer', default='identity')
     parser.add_argument('--representable', action='store_true',
@@ -65,7 +65,7 @@ if __name__ == '__main__':
     parser.add_argument('--mode', type=str,
                         help='training mode: auto-regressive or sequential', default='auto', choices=['auto', 'sequential'])
     parser.add_argument('--seed', type=int, nargs='+',
-                        help='random seed', default=list(range(0, 30)))
+                        help='random seed', default=list(range(0, 10)))
     parser.add_argument('--save_dir', type=str,
                         help='directory to save logs', default=None)
     parser.add_argument('--suffix', type=str,
@@ -75,6 +75,8 @@ if __name__ == '__main__':
                         action='store_true')
     parser.add_argument('-v', '--verbose', action='store_true',
                         help='print training details')
+    parser.add_argument('--loss', type=str, default='mstde',
+                        help='loss options are mstde or msve_true or msve_mc')
 
     args: Namespace = parser.parse_args()
     if args.save_dir:
@@ -108,6 +110,7 @@ if __name__ == '__main__':
         n_batch_per_mrp=args.n_batch_per_mrp,
         log_interval=args.log_interval,
         save_dir=save_dir,
+        training_loss=args.loss
     )
 
     if args.verbose:
@@ -119,6 +122,7 @@ if __name__ == '__main__':
         print(f"Context length: {args.context_length}")
         print(f"Number of states in the MRP: {args.num_states}")
         print(f"Discount factor: {args.gamma}")
+        print(f"Loss function: {args.loss}")
         tf_v = 'representable' if args.representable else 'unrepresentable'
         print(f"Value function is {tf_v} by the features.")
         print(f"Number of MRPs for training: {args.n_mrps}")
@@ -134,8 +138,7 @@ if __name__ == '__main__':
     is_linear = args.activation == 'identity'
 
     Parallel(n_jobs=-1)(
-        delayed(run_training_for_seed)(seed, base_train_args, is_linear) for seed in args.seed
-    )
+        delayed(run_training_for_seed)(seed, base_train_args, is_linear) for seed in args.seed)
     #for seed in args.seed:
     #    run_training_for_seed(seed, base_train_args, is_linear)
 
